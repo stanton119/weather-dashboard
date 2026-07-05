@@ -8,7 +8,7 @@ let forecastData = []; // Processed days
 let activeMetric = 'outside_temp'; // Current metric shown on Y axis
 let activePostcode = 'KT4';
 let activeIndoorTemp = 23;
-let forecastDaysLimit = 14; // Limit for forecast days to show
+let forecastDaysLimit = 7; // Limit for forecast days to show (default 7)
 let chartInstance = null;
 let highlightedDayIndex = null; // Currently highlighted day index
 
@@ -236,10 +236,10 @@ function processForecastData(data) {
   const totalDays = forecastData.length;
   if (rangeSlider) {
     rangeSlider.max = totalDays;
-    if (forecastDaysLimit > totalDays || forecastDaysLimit === 14) {
+    if (forecastDaysLimit > totalDays) {
       forecastDaysLimit = totalDays;
-      rangeSlider.value = totalDays;
     }
+    rangeSlider.value = forecastDaysLimit;
   }
   updateRangeBadge();
 }
