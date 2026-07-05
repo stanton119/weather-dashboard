@@ -8,6 +8,7 @@ let forecastData = []; // Processed days
 let activeMetric = 'outside_temp'; // Current metric shown on Y axis
 let activePostcode = 'KT4';
 let activeIndoorTemp = 23;
+let forecastDaysLimit = 14; // Limit for forecast days to show
 let chartInstance = null;
 let highlightedDayIndex = null; // Currently highlighted day index
 
@@ -18,6 +19,8 @@ const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')
 const forecastForm = document.getElementById('forecastForm');
 const postcodeInput = document.getElementById('postcodeInput');
 const indoorTempInput = document.getElementById('indoorTempInput');
+const rangeSlider = document.getElementById('rangeSlider');
+const rangeValueBadge = document.getElementById('rangeValueBadge');
 const activeLocation = document.getElementById('activeLocation');
 const metricTitle = document.getElementById('metricTitle');
 const forecastPeriod = document.getElementById('forecastPeriod');
@@ -177,6 +180,16 @@ async function fetchForecast(postcode) {
   }
 }
 
+function getVisibleForecastData() {
+  return forecastData.slice(0, forecastDaysLimit);
+}
+
+function updateRangeBadge() {
+  if (rangeValueBadge) {
+    rangeValueBadge.textContent = `${forecastDaysLimit} Day${forecastDaysLimit > 1 ? 's' : ''}`;
+  }
+}
+
 function processForecastData(data) {
   const forecasts = data.forecasts || [];
   forecastData = forecasts.map((dayObj, index) => {
@@ -218,6 +231,17 @@ function processForecastData(data) {
       visible: true // Visible in chart
     };
   });
+
+  // Set range slider limit based on data
+  const totalDays = forecastData.length;
+  if (rangeSlider) {
+    rangeSlider.max = totalDays;
+    if (forecastDaysLimit > totalDays || forecastDaysLimit === 14) {
+      forecastDaysLimit = totalDays;
+      rangeSlider.value = totalDays;
+    }
+  }
+  updateRangeBadge();
 }
 
 /**
@@ -255,14 +279,15 @@ function hideError() {
  * Dashboard updates (Chart, Day Cards, Stats Cards)
  */
 function updateDashboard() {
-  if (forecastData.length === 0) return;
+  const visibleData = getVisibleForecastData();
+  if (visibleData.length === 0) return;
   
   // Update header text
   const metricName = METRICS[activeMetric].label;
   metricTitle.textContent = `${metricName} Forecast`;
   
-  const startDateStr = forecastData[0].formattedDate;
-  const endDateStr = forecastData[forecastData.length - 1].formattedDate;
+  const startDateStr = visibleData[0].formattedDate;
+  const endDateStr = visibleData[visibleData.length - 1].formattedDate;
   forecastPeriod.textContent = `Forecast from ${startDateStr} to ${endDateStr}`;
   activeLocation.textContent = activePostcode;
   chartYLabel.textContent = METRICS[activeMetric].yAxisLabel;
@@ -278,11 +303,12 @@ function updateDashboard() {
  */
 function renderDayCards() {
   dayCardsList.innerHTML = '';
+  const visibleData = getVisibleForecastData();
   
-  forecastData.forEach((day, i) => {
+  visibleData.forEach((day, i) => {
     const card = document.createElement('div');
     card.className = `day-card ${day.visible ? 'active' : ''}`;
-    card.style.setProperty('--day-color', getDayColor(i, forecastData.length));
+    card.style.setProperty('--day-color', getDayColor(i, visibleData.length));
     
     // Select appropriate weather emoji icon
     const icon = getWeatherIcon(day.weatherText);
@@ -336,8 +362,9 @@ function getWeatherIcon(text) {
  */
 function getChartDatasets() {
   const metricConfig = METRICS[activeMetric];
+  const visibleData = getVisibleForecastData();
   
-  return forecastData.map((day, i) => {
+  return visibleData.map((day, i) => {
     // Map report data to hourly array
     const dataArray = Array(24).fill(null);
     day.reports.forEach(report => {
@@ -358,7 +385,7 @@ function getChartDatasets() {
       }
     }
     
-    const lineColor = getDayColor(i, forecastData.length, colorOpacity);
+    const lineColor = getDayColor(i, visibleData.length, colorOpacity);
     
     return {
       label: day.formattedDate,
@@ -459,7 +486,8 @@ function renderChart() {
 
 function updateChartVisibility() {
   if (!chartInstance) return;
-  forecastData.forEach((day, i) => {
+  const visibleData = getVisibleForecastData();
+  visibleData.forEach((day, i) => {
     chartInstance.setDatasetVisibility(i, day.visible);
   });
   chartInstance.update('none'); // Update without full animation for performance
@@ -503,13 +531,14 @@ function handleCustomTooltip(context) {
   // Collect all data values for the current hour
   const activeReports = [];
   
-  forecastData.forEach((day, i) => {
+  const visibleData = getVisibleForecastData();
+  visibleData.forEach((day, i) => {
     if (!day.visible) return;
     const report = day.reports.find(r => r.hour === hourIndex);
     if (report) {
       activeReports.push({
         dayName: day.formattedDate,
-        color: getDayColor(i, forecastData.length),
+        color: getDayColor(i, visibleData.length),
         val: METRICS[activeMetric].getValue(report),
         fullReport: report
       });
@@ -562,7 +591,8 @@ function calculateInsights() {
   let moldSustainedHours = 0; // Number of hours with indoor humidity > 60%
   let totalHours = 0;
 
-  forecastData.forEach(day => {
+  const visibleData = getVisibleForecastData();
+  visibleData.forEach(day => {
     day.reports.forEach(r => {
       totalHours++;
       
@@ -659,6 +689,15 @@ function initEventListeners() {
     }
   });
 
+  // Range slider interaction
+  if (rangeSlider) {
+    rangeSlider.addEventListener('input', () => {
+      forecastDaysLimit = parseInt(rangeSlider.value);
+      updateRangeBadge();
+      updateDashboard();
+    });
+  }
+
   // Metric buttons toggles
   document.querySelectorAll('.metric-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -672,13 +711,13 @@ function initEventListeners() {
   
   // Select All/Deselect All buttons
   document.getElementById('btnSelectAll').addEventListener('click', () => {
-    forecastData.forEach(day => day.visible = true);
+    getVisibleForecastData().forEach(day => day.visible = true);
     document.querySelectorAll('.day-card').forEach(card => card.classList.add('active'));
     updateChartVisibility();
   });
 
   document.getElementById('btnDeselectAll').addEventListener('click', () => {
-    forecastData.forEach(day => day.visible = false);
+    getVisibleForecastData().forEach(day => day.visible = false);
     document.querySelectorAll('.day-card').forEach(card => card.classList.remove('active'));
     updateChartVisibility();
   });
