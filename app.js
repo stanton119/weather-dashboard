@@ -43,51 +43,45 @@ const METRICS = {
   outside_temp: {
     label: 'Outside Temperature',
     unit: '°C',
-    colorScaleStart: 210, // Blue
-    colorScaleEnd: 10,   // Coral-red
     yAxisLabel: 'Temperature (°C)',
     getValue: (report) => report.outside_temp
   },
   inside_humidity: {
     label: 'Indoor Relative Humidity',
     unit: '%',
-    colorScaleStart: 200,
-    colorScaleEnd: 320, // Magenta/purple
     yAxisLabel: 'Indoor Relative Humidity (%)',
     getValue: (report) => report.inside_humidity
   },
   outside_humidity: {
     label: 'Outside Relative Humidity',
     unit: '%',
-    colorScaleStart: 180,
-    colorScaleEnd: 280,
     yAxisLabel: 'Outside Relative Humidity (%)',
     getValue: (report) => report.outside_humidity
   },
   feels_like: {
     label: 'Feels Like Temperature',
     unit: '°C',
-    colorScaleStart: 210,
-    colorScaleEnd: 10,
     yAxisLabel: 'Apparent Temp (°C)',
     getValue: (report) => report.feels_like
   },
   wind_speed: {
     label: 'Wind Speed',
     unit: ' km/h',
-    colorScaleStart: 160,
-    colorScaleEnd: 240,
     yAxisLabel: 'Wind Speed (km/h)',
     getValue: (report) => report.wind_speed
   },
   precip_prob: {
     label: 'Precipitation Probability',
     unit: '%',
-    colorScaleStart: 190,
-    colorScaleEnd: 260,
     yAxisLabel: 'Chance of Rain (%)',
     getValue: (report) => report.precip_prob
   }
+};
+
+// Consistent color scale for the timeline (Now -> Future)
+const TIMELINE_COLORS = {
+  startHue: 205, // Sky Blue (Now)
+  endHue: 280    // Purple (Future)
 };
 
 /**
@@ -109,13 +103,13 @@ function calculateIndoorHumidity(outsideTemp, outsideHumidity, indoorTemp) {
 
 /**
  * Generate beautiful sequential color scale for days in forecast
+ * Now (Today) is Sky Blue, transitioning to Purple for Future.
  */
-function getDayColor(index, total, opacity = 1, forceMetric = null) {
-  const metric = forceMetric || activeMetric;
-  const startHue = METRICS[metric].colorScaleStart;
-  const endHue = METRICS[metric].colorScaleEnd;
-  // Interpolate hue linearly across the forecast window
-  const hue = startHue - (index / Math.max(1, total - 1)) * (startHue - endHue);
+function getDayColor(index, total, opacity = 1) {
+  const startHue = TIMELINE_COLORS.startHue;
+  const endHue = TIMELINE_COLORS.endHue;
+  // Interpolate hue linearly across the forecast window (Now -> Future)
+  const hue = startHue + (index / Math.max(1, total - 1)) * (endHue - startHue);
   return `hsla(${hue}, 85%, 60%, ${opacity})`;
 }
 
