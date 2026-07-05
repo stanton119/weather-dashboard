@@ -1,0 +1,22 @@
+{
+  "name": "aerotemp-weather-dashboard",
+  "version": "1.0.0",
+  "description": "A high-fidelity weather and humidity trend visualization dashboard",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx -y http-server -p 8080 -o"
+  },
+  "keywords": [
+    "weather",
+    "forecast",
+    "humidity",
+    "psychrometrics",
+    "dashboard",
+    "chartjs"
+  ],
+  "author": "Antigravity Pair Programmer",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

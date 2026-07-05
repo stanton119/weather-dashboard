@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroTemp | Weather Trend & Humidity Forecast Dashboard</title>
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Fetching weather forecast data...</div>
+  </div>
+
+  <!-- Sidebar Panel -->
+  <aside>
+    <div class="brand">
+      <div class="brand-icon">
+        <i data-lucide="cloud-sun"></i>
+      </div>
+      <div class="brand-title">AeroTemp</div>
+    </div>
+    
+    <div class="sidebar-content">
+      <!-- Search Form Card -->
+      <div class="glass-card">
+        <form id="forecastForm">
+          <div class="form-group">
+            <label for="postcodeInput">UK Postcode</label>
+            <div class="input-wrapper">
+              <i data-lucide="map-pin"></i>
+              <input type="text" id="postcodeInput" placeholder="e.g. KT4" required>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="indoorTempInput">Indoor Temp (°C)</label>
+            <div class="input-wrapper">
+              <i data-lucide="thermometer"></i>
+              <input type="number" id="indoorTempInput" step="0.5" placeholder="e.g. 21" required>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn-primary">
+            <i data-lucide="refresh-cw"></i> Update Forecast
+          </button>
+        </form>
+      </div>
+
+      <!-- Metrics Toggle Card -->
+      <div class="glass-card">
+        <div class="metrics-section-title">Select Metric</div>
+        <div class="metrics-grid">
+          <button type="button" class="metric-btn active" data-metric="outside_temp">
+            <i data-lucide="thermometer"></i>
+            <div>
+              <div style="font-weight: 600;">Outside Temp</div>
+              <div style="font-size: 11px; opacity: 0.7;">Forecasted air temp</div>
+            </div>
+          </button>
+          
+          <button type="button" class="metric-btn" data-metric="inside_humidity">
+            <i data-lucide="droplet-half"></i>
+            <div>
+              <div style="font-weight: 600;">Indoor Humidity</div>
+              <div style="font-size: 11px; opacity: 0.7;">Calculated psychrometric RH</div>
+            </div>
+          </button>
+          
+          <button type="button" class="metric-btn" data-metric="outside_humidity">
+            <i data-lucide="droplets"></i>
+            <div>
+              <div style="font-weight: 600;">Outside Humidity</div>
+              <div style="font-size: 11px; opacity: 0.7;">Reported ambient RH</div>
+            </div>
+          </button>
+          
+          <button type="button" class="metric-btn" data-metric="feels_like">
+            <i data-lucide="sparkles"></i>
+            <div>
+              <div style="font-weight: 600;">Feels Like Temp</div>
+              <div style="font-size: 11px; opacity: 0.7;">Apparent temperature</div>
+            </div>
+          </button>
+
+          <button type="button" class="metric-btn" data-metric="wind_speed">
+            <i data-lucide="wind"></i>
+            <div>
+              <div style="font-weight: 600;">Wind Speed</div>
+              <div style="font-size: 11px; opacity: 0.7;">Wind velocities & direction</div>
+            </div>
+          </button>
+
+          <button type="button" class="metric-btn" data-metric="precip_prob">
+            <i data-lucide="cloud-rain"></i>
+            <div>
+              <div style="font-weight: 600;">Precipitation %</div>
+              <div style="font-size: 11px; opacity: 0.7;">Probability of rain</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Display Window -->
+  <main class="main-content">
+    <!-- Top Nav Info -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <h2 id="metricTitle">Temperature Forecast Overview</h2>
+        <p id="forecastPeriod">Loading forecast dates...</p>
+      </div>
+      <div class="postcode-badge">
+        <i data-lucide="map-pin"></i>
+        <span id="activeLocation">KT4</span>
+      </div>
+    </header>
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="error-banner">
+      <i data-lucide="alert-circle"></i>
+      <span id="errorMessage">Unable to load forecast data. Please check your postcode and try again.</span>
+    </div>
+
+    <!-- Chart Card -->
+    <div class="glass-card" style="padding: 24px;">
+      <div class="chart-card-header">
+        <div class="chart-card-title" id="chartYLabel">Temperature (°C) over the day</div>
+        <div class="chart-controls">
+          <button class="btn-secondary" id="btnSelectAll">
+            <i data-lucide="check-square"></i> Show All
+          </button>
+          <button class="btn-secondary" id="btnDeselectAll">
+            <i data-lucide="square"></i> Hide All
+          </button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="forecastChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Insights Grid -->
+    <div class="summary-grid">
+      <div class="glass-card insight-card">
+        <div class="insight-icon temp">
+          <i data-lucide="thermometer-sun"></i>
+        </div>
+        <div class="insight-info">
+          <h4>Warmest Peak</h4>
+          <div class="insight-val" id="valWarmest">--</div>
+          <div class="insight-desc" id="descWarmest">--</div>
+        </div>
+      </div>
+
+      <div class="glass-card insight-card">
+        <div class="insight-icon humidity">
+          <i data-lucide="droplet"></i>
+        </div>
+        <div class="insight-info">
+          <h4>Peak Indoor RH</h4>
+          <div class="insight-val" id="valMaxIndoorRH">--</div>
+          <div class="insight-desc" id="descMaxIndoorRH">--</div>
+        </div>
+      </div>
+
+      <div class="glass-card insight-card">
+        <div class="insight-icon wind">
+          <i data-lucide="wind"></i>
+        </div>
+        <div class="insight-info">
+          <h4>Max Wind Gust</h4>
+          <div class="insight-val" id="valWind">--</div>
+          <div class="insight-desc" id="descWind">--</div>
+        </div>
+      </div>
+
+      <div class="glass-card insight-card">
+        <div class="insight-icon mold">
+          <i data-lucide="shield-alert"></i>
+        </div>
+        <div class="insight-info">
+          <h4>Mold Risk</h4>
+          <div class="insight-val" id="valMoldRisk">--</div>
+          <div class="insight-desc" id="descMoldRisk">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Day Cards Section -->
+    <div class="forecast-days-container">
+      <div class="forecast-days-header">
+        <h3 style="font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Forecast Days (Hover to Highlight Line, Click to Toggle)</h3>
+      </div>
+      <div class="day-list" id="dayCardsList">
+        <!-- Dynamic Day Cards Generated by JS -->
+      </div>
+    </div>
+
+    <!-- Psychrometrics Info Box -->
+    <div class="glass-card info-box">
+      <i data-lucide="info" style="width: 20px; height: 20px;"></i>
+      <div>
+        <p><strong>Indoor Relative Humidity Calculation:</strong> Inside humidity is calculated dynamically based on vapor pressure saturation formulas (psychrometrics). Standardizing air temp indoors to your target temperature (e.g. 23°C) alters the capacity of air to hold moisture. High indoor humidity levels (&gt;60%) over sustained periods can lead to dampness, condensation, and structural mold risk.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Custom Tooltip Element -->
+  <div id="chartjs-tooltip"></div>
+
+  <!-- App Logic Javascript -->
+  <script src="app.js"></script>
+</body>
+</html>
