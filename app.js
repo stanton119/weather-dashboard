@@ -9,6 +9,7 @@ let activeMetric = 'outside_temp'; // Current metric shown on Y axis
 let activePostcode = 'KT4';
 let activeIndoorTemp = 23;
 let forecastDaysLimit = 7; // Limit for forecast days to show (default 7)
+let activeChartMode = 'overlay'; // Chart display mode: 'overlay' or 'sequence'
 let chartInstance = null;
 let highlightedDayIndex = null; // Currently highlighted day index
 
@@ -30,6 +31,8 @@ const errorBanner = document.getElementById('errorBanner');
 const errorMessage = document.getElementById('errorMessage');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const customTooltip = document.getElementById('chartjs-tooltip');
+const btnModeOverlay = document.getElementById('btnModeOverlay');
+const btnModeSequence = document.getElementById('btnModeSequence');
 
 // Insights DOM
 const valWarmest = document.getElementById('valWarmest');
@@ -123,23 +126,52 @@ function syncParamsFromURL() {
   const params = new URLSearchParams(window.location.search);
   const pc = params.get('postCode');
   const it = params.get('indoorTemp');
+  const ds = params.get('days');
+  const md = params.get('chartMode');
   
   if (pc) activePostcode = pc.trim().toUpperCase();
   if (it) {
     const parsed = parseFloat(it);
     if (!isNaN(parsed)) activeIndoorTemp = parsed;
   }
+  if (ds) {
+    const parsed = parseInt(ds);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 14) forecastDaysLimit = parsed;
+  }
+  if (md) {
+    if (md === 'overlay' || md === 'sequence') activeChartMode = md;
+  }
   
   // Populate form inputs
   postcodeInput.value = activePostcode;
   indoorTempInput.value = activeIndoorTemp;
   activeLocation.textContent = activePostcode;
+  
+  if (rangeSlider) {
+    rangeSlider.value = forecastDaysLimit;
+  }
+  if (rangeValueBadge) {
+    rangeValueBadge.textContent = `${forecastDaysLimit} Day${forecastDaysLimit > 1 ? 's' : ''}`;
+  }
+  
+  // Update segment control buttons
+  if (btnModeOverlay && btnModeSequence) {
+    if (activeChartMode === 'sequence') {
+      btnModeSequence.classList.add('active');
+      btnModeOverlay.classList.remove('active');
+    } else {
+      btnModeOverlay.classList.add('active');
+      btnModeSequence.classList.remove('active');
+    }
+  }
 }
 
 function updateURLParams() {
   const params = new URLSearchParams();
   params.set('postCode', activePostcode);
   params.set('indoorTemp', activeIndoorTemp);
+  params.set('days', forecastDaysLimit);
+  params.set('chartMode', activeChartMode);
   const newUrl = `${window.location.pathname}?${params.toString()}`;
   window.history.pushState({}, '', newUrl);
 }
@@ -301,6 +333,46 @@ function updateDashboard() {
 /**
  * Render horizontal scrolling list of day cards
  */
+function getDayMetricRange(day, metric) {
+  const metricConfig = METRICS[metric];
+  const values = day.reports
+    .map(r => metricConfig.getValue(r))
+    .filter(val => val !== null && val !== undefined);
+  
+  if (values.length === 0) return '--';
+  
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  
+  if (metric === 'outside_temp' || metric === 'feels_like') {
+    return `<span class="day-temp-max">${Math.round(max)}°</span> <span class="day-temp-min">${Math.round(min)}°</span>`;
+  } else if (metric === 'inside_humidity' || metric === 'outside_humidity') {
+    return `<span class="day-temp-max">${Math.round(max)}%</span> <span class="day-temp-min">${Math.round(min)}%</span>`;
+  } else if (metric === 'wind_speed') {
+    return `<span class="day-temp-max">${Math.round(max)}</span> <span class="day-temp-min" style="font-size: 10px;">km/h</span>`;
+  } else if (metric === 'precip_prob') {
+    return `<span class="day-temp-max">${Math.round(max)}%</span> <span class="day-temp-min" style="font-size: 10px;">rain</span>`;
+  }
+  
+  return `<span class="day-temp-max">${Math.round(max)}</span> <span class="day-temp-min">${Math.round(min)}</span>`;
+}
+
+function getSequenceLabels() {
+  const visibleData = getVisibleForecastData();
+  const labels = [];
+  visibleData.forEach(day => {
+    if (!day.visible) return;
+    day.reports.forEach(r => {
+      const dateLabel = new Date(day.dateStr).toLocaleDateString('en-GB', { weekday: 'short' });
+      labels.push(`${dateLabel} ${r.timeslot}`);
+    });
+  });
+  return labels;
+}
+
+/**
+ * Render horizontal scrolling list of day cards
+ */
 function renderDayCards() {
   dayCardsList.innerHTML = '';
   const visibleData = getVisibleForecastData();
@@ -312,14 +384,14 @@ function renderDayCards() {
     
     // Select appropriate weather emoji icon
     const icon = getWeatherIcon(day.weatherText);
+    const metricRangeHtml = getDayMetricRange(day, activeMetric);
     
     card.innerHTML = `
       <div class="day-name">${i === 0 ? 'Today' : new Date(day.dateStr).toLocaleDateString('en-GB', { weekday: 'short' })}</div>
       <div class="day-date">${new Date(day.dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
       <span class="day-weather-icon">${icon}</span>
       <div class="day-temp-range">
-        <span class="day-temp-max">${day.maxTemp}°</span>
-        <span class="day-temp-min">${day.minTemp}°</span>
+        ${metricRangeHtml}
       </div>
     `;
     
@@ -364,49 +436,81 @@ function getChartDatasets() {
   const metricConfig = METRICS[activeMetric];
   const visibleData = getVisibleForecastData();
   
-  return visibleData.map((day, i) => {
-    // Map report data to hourly array
-    const dataArray = Array(24).fill(null);
-    day.reports.forEach(report => {
-      dataArray[report.hour] = metricConfig.getValue(report);
+  if (activeChartMode === 'sequence') {
+    const dataArray = [];
+    visibleData.forEach(day => {
+      if (!day.visible) return;
+      day.reports.forEach(report => {
+        dataArray.push(metricConfig.getValue(report));
+      });
     });
     
-    // Compute styling: handle dimmed or highlighted hover states
-    let colorOpacity = 0.8;
-    let borderWidth = 2;
-    
-    if (highlightedDayIndex !== null) {
-      if (highlightedDayIndex === i) {
-        colorOpacity = 1.0;
-        borderWidth = 4;
-      } else {
-        colorOpacity = 0.15;
-        borderWidth = 1.5;
-      }
-    }
-    
-    const lineColor = getDayColor(i, visibleData.length, colorOpacity);
-    
-    return {
-      label: day.formattedDate,
+    return [{
+      label: `${metricConfig.label} Sequence`,
       data: dataArray,
-      borderColor: lineColor,
+      borderColor: function(context) {
+        const chart = context.chart;
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return null;
+        const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+        gradient.addColorStop(0, `hsla(${TIMELINE_COLORS.startHue}, 85%, 60%, 1)`);
+        gradient.addColorStop(1, `hsla(${TIMELINE_COLORS.endHue}, 85%, 60%, 1)`);
+        return gradient;
+      },
       backgroundColor: 'transparent',
-      borderWidth: borderWidth,
+      borderWidth: 3,
       tension: 0.35,
       spanGaps: true,
-      hidden: !day.visible,
-      pointBackgroundColor: lineColor,
+      pointRadius: 0,
       pointHoverRadius: 6,
       pointHoverBackgroundColor: '#ffffff',
-      pointHoverBorderColor: lineColor,
-      pointHoverBorderWidth: 2,
-      pointRadius: (context) => {
-        // Only show small dots on data points, highlight when hovered
-        return context.dataset.hidden ? 0 : 2;
+      pointHoverBorderWidth: 2
+    }];
+  } else {
+    return visibleData.map((day, i) => {
+      // Map report data to hourly array
+      const dataArray = Array(24).fill(null);
+      day.reports.forEach(report => {
+        dataArray[report.hour] = metricConfig.getValue(report);
+      });
+      
+      // Compute styling: handle dimmed or highlighted hover states
+      let colorOpacity = 0.8;
+      let borderWidth = 2;
+      
+      if (highlightedDayIndex !== null) {
+        if (highlightedDayIndex === i) {
+          colorOpacity = 1.0;
+          borderWidth = 4;
+        } else {
+          colorOpacity = 0.15;
+          borderWidth = 1.5;
+        }
       }
-    };
-  });
+      
+      const lineColor = getDayColor(i, visibleData.length, colorOpacity);
+      
+      return {
+        label: day.formattedDate,
+        data: dataArray,
+        borderColor: lineColor,
+        backgroundColor: 'transparent',
+        borderWidth: borderWidth,
+        tension: 0.35,
+        spanGaps: true,
+        hidden: !day.visible,
+        pointBackgroundColor: lineColor,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#ffffff',
+        pointHoverBorderColor: lineColor,
+        pointHoverBorderWidth: 2,
+        pointRadius: (context) => {
+          // Only show small dots on data points, highlight when hovered
+          return context.dataset.hidden ? 0 : 2;
+        }
+      };
+    });
+  }
 }
 
 /**
@@ -424,7 +528,7 @@ function renderChart() {
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: HOURS,
+      labels: activeChartMode === 'sequence' ? getSequenceLabels() : HOURS,
       datasets: datasets
     },
     options: {
@@ -457,9 +561,16 @@ function renderChart() {
               family: 'Outfit',
               size: 11
             },
-            // Show tick labels every 3 hours for cleaner look
             callback: function(val, index) {
-              return index % 3 === 0 ? HOURS[index] : '';
+              const label = this.getLabelForValue(val);
+              if (activeChartMode === 'sequence') {
+                if (label && label.endsWith('12:00')) {
+                  return label.split(' ')[0];
+                }
+                return '';
+              } else {
+                return index % 3 === 0 ? label : '';
+              }
             }
           }
         },
@@ -486,22 +597,29 @@ function renderChart() {
 
 function updateChartVisibility() {
   if (!chartInstance) return;
-  const visibleData = getVisibleForecastData();
-  visibleData.forEach((day, i) => {
-    chartInstance.setDatasetVisibility(i, day.visible);
-  });
-  chartInstance.update('none'); // Update without full animation for performance
+  if (activeChartMode === 'sequence') {
+    renderChart();
+  } else {
+    const visibleData = getVisibleForecastData();
+    visibleData.forEach((day, i) => {
+      chartInstance.setDatasetVisibility(i, day.visible);
+    });
+    chartInstance.update('none'); // Update without full animation for performance
+  }
 }
 
 function updateChartLineStyle() {
   if (!chartInstance) return;
+  if (activeChartMode === 'sequence') return;
   
   const datasets = getChartDatasets();
   datasets.forEach((dataset, i) => {
-    chartInstance.data.datasets[i].borderColor = dataset.borderColor;
-    chartInstance.data.datasets[i].borderWidth = dataset.borderWidth;
-    chartInstance.data.datasets[i].pointHoverBorderColor = dataset.pointHoverBorderColor;
-    chartInstance.data.datasets[i].pointBackgroundColor = dataset.pointBackgroundColor;
+    if (chartInstance.data.datasets[i]) {
+      chartInstance.data.datasets[i].borderColor = dataset.borderColor;
+      chartInstance.data.datasets[i].borderWidth = dataset.borderWidth;
+      chartInstance.data.datasets[i].pointHoverBorderColor = dataset.pointHoverBorderColor;
+      chartInstance.data.datasets[i].pointBackgroundColor = dataset.pointBackgroundColor;
+    }
   });
   
   chartInstance.update('none'); // Update style instantly
@@ -524,48 +642,96 @@ function handleCustomTooltip(context) {
   
   // Grab the hour index
   const hourIndex = dataPoints[0].dataIndex;
-  const hourLabel = HOURS[hourIndex];
+  let html = '';
   
-  let html = `<div class="tooltip-header"><span>Time: ${hourLabel}</span></div>`;
-  
-  // Collect all data values for the current hour
-  const activeReports = [];
-  
-  const visibleData = getVisibleForecastData();
-  visibleData.forEach((day, i) => {
-    if (!day.visible) return;
-    const report = day.reports.find(r => r.hour === hourIndex);
-    if (report) {
-      activeReports.push({
-        dayName: day.formattedDate,
-        color: getDayColor(i, visibleData.length),
-        val: METRICS[activeMetric].getValue(report),
-        fullReport: report
-      });
-    }
-  });
-  
-  // Sort reports so they display in order of day
-  activeReports.forEach(item => {
-    const valStr = item.val !== null ? `${item.val}${METRICS[activeMetric].unit}` : 'N/A';
+  if (activeChartMode === 'sequence') {
+    const visibleData = getVisibleForecastData();
+    let counter = 0;
+    let targetReport = null;
+    let targetDay = null;
+    let targetDayIndex = 0;
     
-    // Add additional secondary info context depending on active metric
-    let extraInfo = '';
-    if (activeMetric === 'outside_temp') {
-      extraInfo = ` | RH: ${item.fullReport.outside_humidity}%`;
-    } else if (activeMetric === 'inside_humidity') {
-      extraInfo = ` | Out T: ${item.fullReport.outside_temp}°C`;
-    } else if (activeMetric === 'outside_humidity') {
-      extraInfo = ` | In RH: ${item.fullReport.inside_humidity}%`;
+    for (let i = 0; i < visibleData.length; i++) {
+      const day = visibleData[i];
+      if (!day.visible) continue;
+      for (let j = 0; j < day.reports.length; j++) {
+        if (counter === hourIndex) {
+          targetReport = day.reports[j];
+          targetDay = day;
+          targetDayIndex = i;
+          break;
+        }
+        counter++;
+      }
+      if (targetReport) break;
     }
     
-    html += `
-      <div class="tooltip-row" style="color: ${item.color};">
-        <span class="tooltip-label">${item.dayName}${extraInfo}</span>
-        <span class="tooltip-value">${valStr}</span>
-      </div>
-    `;
-  });
+    if (targetReport) {
+      const val = METRICS[activeMetric].getValue(targetReport);
+      const valStr = val !== null ? `${val}${METRICS[activeMetric].unit}` : 'N/A';
+      const color = getDayColor(targetDayIndex, visibleData.length);
+      
+      let extraInfo = '';
+      if (activeMetric === 'outside_temp') {
+        extraInfo = `<div style="font-size: 11px; margin-top: 6px; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px;">Humidity: ${targetReport.outside_humidity}%</div>`;
+      } else if (activeMetric === 'inside_humidity') {
+        extraInfo = `<div style="font-size: 11px; margin-top: 6px; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px;">Out Temp: ${targetReport.outside_temp}°C</div>`;
+      } else if (activeMetric === 'outside_humidity') {
+        extraInfo = `<div style="font-size: 11px; margin-top: 6px; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px;">In Humidity: ${targetReport.inside_humidity}%</div>`;
+      }
+      
+      html = `
+        <div class="tooltip-header">
+          <span>${targetDay.formattedDate}</span>
+          <span>${targetReport.timeslot}</span>
+        </div>
+        <div class="tooltip-row" style="color: ${color}; font-weight: 700; font-size: 14px;">
+          <span>${METRICS[activeMetric].label}</span>
+          <span>${valStr}</span>
+        </div>
+        ${extraInfo}
+      `;
+    }
+  } else {
+    const hourLabel = HOURS[hourIndex];
+    html = `<div class="tooltip-header"><span>Time: ${hourLabel}</span></div>`;
+    const activeReports = [];
+    const visibleData = getVisibleForecastData();
+    
+    visibleData.forEach((day, i) => {
+      if (!day.visible) return;
+      const report = day.reports.find(r => r.hour === hourIndex);
+      if (report) {
+        activeReports.push({
+          dayName: day.formattedDate,
+          color: getDayColor(i, visibleData.length),
+          val: METRICS[activeMetric].getValue(report),
+          fullReport: report
+        });
+      }
+    });
+    
+    activeReports.forEach(item => {
+      const valStr = item.val !== null ? `${item.val}${METRICS[activeMetric].unit}` : 'N/A';
+      
+      // Add additional secondary info context depending on active metric
+      let extraInfo = '';
+      if (activeMetric === 'outside_temp') {
+        extraInfo = ` | RH: ${item.fullReport.outside_humidity}%`;
+      } else if (activeMetric === 'inside_humidity') {
+        extraInfo = ` | Out T: ${item.fullReport.outside_temp}°C`;
+      } else if (activeMetric === 'outside_humidity') {
+        extraInfo = ` | In RH: ${item.fullReport.inside_humidity}%`;
+      }
+      
+      html += `
+        <div class="tooltip-row" style="color: ${item.color};">
+          <span class="tooltip-label">${item.dayName}${extraInfo}</span>
+          <span class="tooltip-value">${valStr}</span>
+        </div>
+      `;
+    });
+  }
   
   customTooltip.innerHTML = html;
   
@@ -694,7 +860,31 @@ function initEventListeners() {
     rangeSlider.addEventListener('input', () => {
       forecastDaysLimit = parseInt(rangeSlider.value);
       updateRangeBadge();
+      updateURLParams();
       updateDashboard();
+    });
+  }
+
+  // Segmented control buttons toggles (Overlay vs Sequence)
+  if (btnModeOverlay && btnModeSequence) {
+    btnModeOverlay.addEventListener('click', () => {
+      if (activeChartMode !== 'overlay') {
+        activeChartMode = 'overlay';
+        btnModeOverlay.classList.add('active');
+        btnModeSequence.classList.remove('active');
+        updateURLParams();
+        updateDashboard();
+      }
+    });
+
+    btnModeSequence.addEventListener('click', () => {
+      if (activeChartMode !== 'sequence') {
+        activeChartMode = 'sequence';
+        btnModeSequence.classList.add('active');
+        btnModeOverlay.classList.remove('active');
+        updateURLParams();
+        updateDashboard();
+      }
     });
   }
 

@@ -400,7 +400,41 @@ header.top-bar {
 
 .chart-controls {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Segmented Control for Chart Mode Toggle */
+.segmented-control {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segment-btn:hover {
+  color: var(--text-primary);
+}
+
+.segment-btn.active {
+  background: var(--accent-color);
+  color: white;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 }
 
 .btn-secondary {
