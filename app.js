@@ -224,15 +224,37 @@ function updateRangeBadge() {
 
 function processForecastData(data) {
   const forecasts = data.forecasts || [];
-  forecastData = forecasts.map((dayObj, index) => {
+  
+  // Group all hourly reports by their calendar date (localDate)
+  const reportsByDate = {};
+  const summaryByDate = {};
+  
+  forecasts.forEach(dayObj => {
+    const summaryReport = (dayObj.summary && dayObj.summary.report) || {};
+    if (summaryReport.localDate) {
+      summaryByDate[summaryReport.localDate] = summaryReport;
+    }
+    
     const detailed = dayObj.detailed || {};
     const reports = detailed.reports || [];
-    const summary = dayObj.summary || {};
-    const summaryReport = summary.report || {};
     
-    const dateStr = summaryReport.localDate || (reports[0] && reports[0].localDate) || '';
+    reports.forEach(r => {
+      if (!r.localDate) return;
+      if (!reportsByDate[r.localDate]) {
+        reportsByDate[r.localDate] = [];
+      }
+      reportsByDate[r.localDate].push(r);
+    });
+  });
+  
+  // Sort the calendar dates chronologically
+  const sortedDates = Object.keys(reportsByDate).sort();
+  
+  forecastData = sortedDates.map((dateStr, index) => {
+    const reportsForDate = reportsByDate[dateStr];
     
-    const parsedReports = reports.map(r => {
+    // Sort reports for this specific date by hour chronologically
+    const parsedReports = reportsForDate.map(r => {
       const outside_temp = r.temperatureC;
       const outside_humidity = r.humidity;
       const inside_humidity = calculateIndoorHumidity(outside_temp, outside_humidity, activeIndoorTemp);
@@ -250,17 +272,31 @@ function processForecastData(data) {
         precip_prob: r.precipitationProbabilityInPercent,
         weather_text: r.weatherTypeText || 'Unknown'
       };
-    });
-
+    }).sort((a, b) => a.hour - b.hour);
+    
+    const summaryReport = summaryByDate[dateStr] || {};
+    const temps = parsedReports.map(r => r.outside_temp).filter(t => t !== null && t !== undefined);
+    
+    // Calculate fallback values for max/min if summary isn't available for this date
+    const maxTemp = summaryReport.maxTempC !== null && summaryReport.maxTempC !== undefined ? 
+      summaryReport.maxTempC : (temps.length ? Math.max(...temps) : '--');
+    const minTemp = summaryReport.minTempC !== null && summaryReport.minTempC !== undefined ? 
+      summaryReport.minTempC : (temps.length ? Math.min(...temps) : '--');
+    
+    // Fallback weather text to midday forecast if summary isn't available
+    const midIndex = Math.floor(parsedReports.length / 2);
+    const weatherText = summaryReport.weatherTypeText || 
+      (parsedReports[midIndex] && parsedReports[midIndex].weather_text) || 'Cloudy';
+    
     return {
       index,
       dateStr,
       formattedDate: formatDateLabel(dateStr),
-      maxTemp: summaryReport.maxTempC !== null ? summaryReport.maxTempC : Math.max(...parsedReports.map(r => r.outside_temp)),
-      minTemp: summaryReport.minTempC !== null ? summaryReport.minTempC : Math.min(...parsedReports.map(r => r.outside_temp)),
-      weatherText: summaryReport.weatherTypeText || (parsedReports[12] && parsedReports[12].weather_text) || 'Cloudy',
+      maxTemp,
+      minTemp,
+      weatherText,
       reports: parsedReports,
-      visible: true // Visible in chart
+      visible: true
     };
   });
 
