@@ -2,21 +2,27 @@
 
 A premium, interactive weather and humidity trend visualization dashboard built using HTML, Vanilla CSS, and modern JavaScript. It fetches live, detailed weather data from the BBC Weather Aggregated API for any UK postcode.
 
-![AeroTemp Mockup](https://images.unsplash.com/photo-1592210454359-9043f067919b?w=1200&q=80)
+🌐 **[View live demo →](https://www.richard-stanton.com/weather-dashboard/)**
+
+![AeroTemp Screenshot](screenshot.png)
 
 ## Features
 
 - **Postcode & Indoor Temp Filtering:** Fetches live weather data for any UK postcode (e.g. `KT4`, `SW1A`) and calculates indoor relative humidity on the fly.
-- **Dynamic Multi-Dataset Charting:** Plots hourly variations of metrics over the 14-day forecast window. Each day is represented as a separate line, colored using a custom chronological HSL spectral scale to view progression trends easily.
+- **Forecast Range Slider:** Limit the chart to the next 1–14 days with a live-updating range slider (defaults to 7 days).
+- **Overlay & Sequence Modes:** Toggle between overlaying each day on a 24-hour grid (for comparison) or viewing all days as a continuous chronological timeline with a gradient colour sweep.
 - **Advanced Metric Selector:** Toggle between:
   - Outside Temperature
-  - Indoor Humidity (calculated via vapor pressure saturation formulas)
+  - Indoor Humidity (calculated via vapour pressure saturation formulas)
   - Outside Relative Humidity
   - Feels Like Temp
   - Wind Speed
   - Precipitation Probability
+- **Dynamic Day Tiles:** The min/max values shown on each day card update to reflect the currently selected metric.
+- **Consistent Colour Legend:** Days are coloured on a unified Sky Blue (now) → Purple (future) timeline scale across all metrics, with a "Now → Future" legend.
 - **High-Fidelity Tooltip & Highlight Effects:** Hover over day summary cards to highlight that day's line on the chart. Toggle lines on/off by clicking cards. Custom tooltips show multi-dimensional comparisons.
 - **Smart Insights Panel:** Dynamically calculates maximum temperature peaks, maximum indoor RH peaks, maximum wind speeds, and assesses damp/mold risks based on sustained high indoor humidity.
+- **URL State Persistence:** Postcode, indoor temp, forecast range, and chart mode are all synced to URL parameters for easy sharing/bookmarking.
 
 ## Indoor Humidity Calculation
 
