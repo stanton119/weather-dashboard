@@ -785,24 +785,354 @@ header.top-bar {
   font-weight: 600;
 }
 
-/* Media Queries for Responsiveness */
+/* ============================================
+   MOBILE NAV BAR (hidden on desktop)
+   ============================================ */
+.mobile-nav {
+  display: none;
+}
+
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ============================================
+   TABLET BREAKPOINT (≤ 1024px)
+   ============================================ */
 @media (max-width: 1024px) {
   body {
     flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
   }
-  
+
   aside {
     width: 100%;
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--border-color);
   }
-  
+
   .main-content {
     height: auto;
     overflow: visible;
     padding: 20px;
   }
+
+  .chart-container {
+    height: 360px;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
+
+/* ============================================
+   MOBILE BREAKPOINT (≤ 768px)
+   ============================================ */
+@media (max-width: 768px) {
+
+  /* --- Body & Layout --- */
+  body {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 60px; /* room for mobile nav */
+  }
+
+  /* --- Mobile Top Nav Bar --- */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    height: 60px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .menu-toggle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .menu-toggle:hover,
+  .menu-toggle:active {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* --- Sidebar as Drawer --- */
+  aside {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 320px;
+    max-width: 85vw;
+    height: 100vh;
+    z-index: 60;
+    border-right: 1px solid var(--border-color);
+    border-bottom: none;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  aside.open {
+    transform: translateX(0);
+  }
+
+  /* Sidebar close (X) button — visible inside drawer */
+  .sidebar-toggle {
+    display: flex;
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+  }
+
+  /* --- Sidebar Backdrop --- */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 55;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* --- Main content --- */
+  .main-content {
+    height: auto;
+    overflow: visible;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  /* --- Top Bar (desktop header) --- */
+  .top-bar {
+    display: none; /* replaced by mobile-nav */
+  }
+
+  /* --- Chart --- */
+  .chart-container {
+    height: 280px;
+  }
+
+  .chart-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .chart-card-title {
+    font-size: 15px;
+  }
+
+  .chart-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .segmented-control {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .segment-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+  }
+
+  .btn-secondary {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  /* Chart card padding */
+  .glass-card[style*="padding: 24px"] {
+    padding: 16px !important;
+  }
+
+  /* --- Metric buttons: 2 column grid --- */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .metric-btn {
+    padding: 10px 8px;
+    font-size: 12px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .metric-btn i {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* --- Day cards: scroll row --- */
+  .day-list {
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  .day-card {
+    min-width: 110px;
+    padding: 12px 10px;
+  }
+
+  .day-name {
+    font-size: 13px;
+  }
+
+  .day-weather-icon {
+    font-size: 18px;
+  }
+
+  /* --- Forecast days header --- */
+  .forecast-days-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  #dayCardsHelp {
+    font-size: 12px !important;
+    letter-spacing: 0.3px;
+  }
+
+  /* --- Summary grid: 2 column on mobile --- */
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .insight-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .insight-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .insight-val {
+    font-size: 18px;
+  }
+
+  /* --- Info box --- */
+  .info-box {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* --- Increase form input tap targets --- */
+  input[type="text"],
+  input[type="number"] {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    padding: 14px 14px 14px 40px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .btn-primary {
+    padding: 14px;
+    font-size: 16px;
+  }
+}
+
+/* ============================================
+   SMALL MOBILE (≤ 480px)
+   ============================================ */
+@media (max-width: 480px) {
+  .chart-container {
+    height: 230px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .insight-val {
+    font-size: 16px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-btn {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .day-card {
+    min-width: 95px;
+    padding: 10px 8px;
+  }
+}
+

@@ -29,6 +29,9 @@
         <i data-lucide="cloud-sun"></i>
       </div>
       <div class="brand-title">AeroTemp</div>
+      <button id="sidebarToggle" class="sidebar-toggle" aria-label="Close sidebar">
+        <i data-lucide="x"></i>
+      </button>
     </div>
     
     <div class="sidebar-content">
@@ -57,7 +60,7 @@
               <span id="rangeValueBadge" class="range-badge">7 Days</span>
             </div>
             <div class="slider-wrapper">
-              <input type="range" id="rangeSlider" min="1" max="14" value="7" step="1">
+              <input type="range" id="rangeSlider" min="1" max="16" value="7" step="1">
             </div>
           </div>
           
@@ -123,6 +126,26 @@
     </div>
   </aside>
 
+  <!-- Mobile Nav Bar -->
+  <div class="mobile-nav">
+    <button id="menuToggle" class="menu-toggle" aria-label="Open settings">
+      <i data-lucide="sliders-horizontal"></i>
+    </button>
+    <div class="mobile-brand">
+      <div class="brand-icon" style="width:28px;height:28px;border-radius:8px;">
+        <i data-lucide="cloud-sun" style="width:14px;height:14px;"></i>
+      </div>
+      <span class="brand-title" style="font-size:16px;">AeroTemp</span>
+    </div>
+    <div class="postcode-badge" id="mobilePostcodeBadge">
+      <i data-lucide="map-pin"></i>
+      <span id="activeLocationMobile">KT4</span>
+    </div>
+  </div>
+
+  <!-- Sidebar Backdrop -->
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
   <!-- Main Display Window -->
   <main class="main-content">
     <!-- Top Nav Info -->
@@ -168,7 +191,7 @@
     <!-- Day Cards Section -->
     <div class="forecast-days-container">
       <div class="forecast-days-header">
-        <h3 style="font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Forecast Days (Hover to Highlight Line, Click to Toggle)</h3>
+        <h3 id="dayCardsHelp" style="font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);">Forecast Days (Tap to Toggle, Hold to Preview)</h3>
         <div class="color-legend">
           <span class="legend-text">Now</span>
           <div class="legend-bar"></div>

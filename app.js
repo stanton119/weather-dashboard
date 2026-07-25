@@ -23,6 +23,7 @@ const indoorTempInput = document.getElementById('indoorTempInput');
 const rangeSlider = document.getElementById('rangeSlider');
 const rangeValueBadge = document.getElementById('rangeValueBadge');
 const activeLocation = document.getElementById('activeLocation');
+const activeLocationMobile = document.getElementById('activeLocationMobile');
 const metricTitle = document.getElementById('metricTitle');
 const forecastPeriod = document.getElementById('forecastPeriod');
 const chartYLabel = document.getElementById('chartYLabel');
@@ -136,7 +137,7 @@ function syncParamsFromURL() {
   }
   if (ds) {
     const parsed = parseInt(ds);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 14) forecastDaysLimit = parsed;
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 16) forecastDaysLimit = parsed;
   }
   if (md) {
     if (md === 'overlay' || md === 'sequence') activeChartMode = md;
@@ -146,6 +147,7 @@ function syncParamsFromURL() {
   postcodeInput.value = activePostcode;
   indoorTempInput.value = activeIndoorTemp;
   activeLocation.textContent = activePostcode;
+  if (activeLocationMobile) activeLocationMobile.textContent = activePostcode;
   
   if (rangeSlider) {
     rangeSlider.value = forecastDaysLimit;
@@ -358,6 +360,7 @@ function updateDashboard() {
   const endDateStr = visibleData[visibleData.length - 1].formattedDate;
   forecastPeriod.textContent = `Forecast from ${startDateStr} to ${endDateStr}`;
   activeLocation.textContent = activePostcode;
+  if (activeLocationMobile) activeLocationMobile.textContent = activePostcode;
   chartYLabel.textContent = METRICS[activeMetric].yAxisLabel;
   
   // Render subcomponents
@@ -439,7 +442,7 @@ function renderDayCards() {
       updateChartVisibility();
     });
     
-    // Hover listeners to highlight the corresponding chart line
+    // Hover listeners to highlight the corresponding chart line (desktop)
     card.addEventListener('mouseenter', () => {
       highlightedDayIndex = i;
       updateChartLineStyle();
@@ -449,6 +452,30 @@ function renderDayCards() {
       highlightedDayIndex = null;
       updateChartLineStyle();
     });
+
+    // Touch listeners to highlight the chart line on mobile (long-press = hold)
+    let touchTimer = null;
+    card.addEventListener('touchstart', (e) => {
+      touchTimer = setTimeout(() => {
+        highlightedDayIndex = i;
+        updateChartLineStyle();
+        touchTimer = null;
+      }, 200);
+    }, { passive: true });
+
+    card.addEventListener('touchend', () => {
+      if (touchTimer !== null) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+      // Delay clearing so the user can see the highlight briefly
+      setTimeout(() => {
+        if (highlightedDayIndex === i) {
+          highlightedDayIndex = null;
+          updateChartLineStyle();
+        }
+      }, 600);
+    }, { passive: true });
     
     dayCardsList.appendChild(card);
   });
@@ -953,12 +980,55 @@ function initEventListeners() {
 function startApp() {
   syncParamsFromURL();
   initEventListeners();
-  
+  initMobileNav();
+
+  // Update help text based on device type
+  const helpEl = document.getElementById('dayCardsHelp');
+  if (helpEl) {
+    const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    helpEl.textContent = isTouchDevice
+      ? 'Forecast Days (Tap to Toggle, Hold to Preview)'
+      : 'Forecast Days (Hover to Highlight Line, Click to Toggle)';
+  }
+
   // Fetch default forecast
   fetchForecast(activePostcode);
-  
+
   // Create icons
   lucide.createIcons();
+}
+
+/**
+ * Mobile sidebar drawer toggle
+ */
+function initMobileNav() {
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebar = document.querySelector('aside');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    backdrop.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('visible');
+    document.body.style.overflow = '';
+  }
+
+  if (menuToggle) menuToggle.addEventListener('click', openSidebar);
+  if (sidebarToggle) sidebarToggle.addEventListener('click', closeSidebar);
+  if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+  // Close sidebar after form submit on mobile
+  if (forecastForm) {
+    forecastForm.addEventListener('submit', () => {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  }
 }
 
 // Kickoff
