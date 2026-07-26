@@ -798,11 +798,24 @@ function handleCustomTooltip(context) {
   
   customTooltip.innerHTML = html;
   
-  // Positioning the tooltip
+  // Positioning the tooltip — clamp to viewport to prevent page-width expansion on mobile
   const position = context.chart.canvas.getBoundingClientRect();
-  
+  const tooltipWidth = customTooltip.offsetWidth || 160;
+  const caretAbsLeft = position.left + tooltipModel.caretX;
+  const gap = 15;
+
+  let left;
+  if (caretAbsLeft + gap + tooltipWidth > window.innerWidth) {
+    // Flip: place tooltip to the left of the caret
+    left = caretAbsLeft - tooltipWidth - gap;
+  } else {
+    left = caretAbsLeft + gap;
+  }
+  // Ensure it never goes off the left edge either
+  left = Math.max(8, left);
+
   customTooltip.style.opacity = 1;
-  customTooltip.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 15 + 'px';
+  customTooltip.style.left = left + window.pageXOffset + 'px';
   customTooltip.style.top = position.top + window.pageYOffset + tooltipModel.caretY - 20 + 'px';
 }
 

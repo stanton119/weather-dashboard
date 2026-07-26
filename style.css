@@ -755,6 +755,7 @@ header.top-bar {
   font-size: 12px;
   font-family: var(--font-sans);
   min-width: 150px;
+  max-width: calc(100vw - 16px);
 }
 
 #chartjs-tooltip .tooltip-header {
