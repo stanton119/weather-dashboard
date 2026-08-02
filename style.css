@@ -990,19 +990,21 @@ header.top-bar {
   }
 
   .segmented-control {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 100%;
   }
 
   .segment-btn {
     flex: 1;
+    white-space: nowrap;
     text-align: center;
     padding: 6px 8px;
   }
 
   .btn-secondary {
+    flex: 1;
     font-size: 12px;
     padding: 6px 10px;
+    justify-content: center;
   }
 
   /* Chart card padding */
