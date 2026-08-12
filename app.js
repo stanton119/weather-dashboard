@@ -142,6 +142,10 @@ function syncParamsFromURL() {
   if (md) {
     if (md === 'overlay' || md === 'sequence') activeChartMode = md;
   }
+  const mt = params.get('metric');
+  if (mt && METRICS[mt]) {
+    activeMetric = mt;
+  }
   
   // Populate form inputs
   postcodeInput.value = activePostcode;
@@ -166,6 +170,11 @@ function syncParamsFromURL() {
       btnModeSequence.classList.remove('active');
     }
   }
+  if (mt && METRICS[mt]) {
+    document.querySelectorAll('.metric-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.metric === activeMetric);
+    });
+  }
 }
 
 function updateURLParams() {
@@ -174,6 +183,7 @@ function updateURLParams() {
   params.set('indoorTemp', activeIndoorTemp);
   params.set('days', forecastDaysLimit);
   params.set('chartMode', activeChartMode);
+  params.set('metric', activeMetric);
   const newUrl = `${window.location.pathname}?${params.toString()}`;
   window.history.pushState({}, '', newUrl);
 }
@@ -971,6 +981,7 @@ function initEventListeners() {
       btn.classList.add('active');
       
       activeMetric = btn.dataset.metric;
+      updateURLParams();
       updateDashboard();
     });
   });
