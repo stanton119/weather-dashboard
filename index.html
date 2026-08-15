@@ -47,14 +47,6 @@
           </div>
           
           <div class="form-group">
-            <label for="indoorTempInput">Indoor Temp (°C)</label>
-            <div class="input-wrapper">
-              <i data-lucide="thermometer"></i>
-              <input type="number" id="indoorTempInput" step="0.5" placeholder="e.g. 21" required>
-            </div>
-          </div>
-          
-          <div class="form-group">
             <div class="slider-header">
               <label for="rangeSlider">Forecast Range</label>
               <span id="rangeValueBadge" class="range-badge">7 Days</span>
@@ -82,13 +74,23 @@
             </div>
           </button>
           
-          <button type="button" class="metric-btn" data-metric="inside_humidity">
-            <i data-lucide="droplet-half"></i>
-            <div>
-              <div style="font-weight: 600;">Indoor Humidity</div>
-              <div style="font-size: 11px; opacity: 0.7;">Calculated psychrometric RH</div>
+          <div class="metric-item">
+            <button type="button" class="metric-btn" data-metric="inside_humidity">
+              <i data-lucide="droplet-half"></i>
+              <div>
+                <div style="font-weight: 600;">Indoor Humidity</div>
+                <div style="font-size: 11px; opacity: 0.7;">Calculated psychrometric RH</div>
+              </div>
+            </button>
+            <div class="indoor-temp-panel" id="indoorTempPanel">
+              <div class="indoor-temp-label">Assumed Indoor Temp (°C)</div>
+              <div class="indoor-temp-input-wrapper">
+                <i data-lucide="thermometer"></i>
+                <input type="number" id="indoorTempInput" step="0.5" placeholder="e.g. 21">
+              </div>
+              <div class="indoor-temp-note">Assumed indoor air temp used to calculate indoor RH. Also feeds Peak Indoor RH &amp; Mold Risk insights.</div>
             </div>
-          </button>
+          </div>
           
           <button type="button" class="metric-btn" data-metric="outside_humidity">
             <i data-lucide="droplets"></i>
