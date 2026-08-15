@@ -16,6 +16,27 @@ let highlightedDayIndex = null; // Currently highlighted day index
 // Configuration constants
 const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 
+const HALF_HOUR_LABELS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = (i % 2) * 30;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
+
+const CARBON_SERIES = [
+  { key: 'regional_forecast', label: 'Regional Forecast', short: 'Regional F', color: '#34d399', dash: [] },
+  { key: 'national_forecast', label: 'National Forecast', short: 'National F', color: '#60a5fa', dash: [] },
+  { key: 'regional_historic', label: 'Regional Historic', short: 'Regional H', color: '#a78bfa', dash: [4, 4] },
+  { key: 'national_historic', label: 'National Historic', short: 'National H', color: '#fbbf24', dash: [4, 4] }
+];
+
+let carbonData = [];
+let carbonSeriesVisible = [true, true, true, true];
+let carbonSequenceReports = [];
+
+function isCarbonMetric() {
+  return activeMetric === 'carbon_intensity';
+}
+
 // DOM Elements
 const forecastForm = document.getElementById('forecastForm');
 const postcodeInput = document.getElementById('postcodeInput');
@@ -235,7 +256,84 @@ async function fetchForecast(postcode) {
 }
 
 function getVisibleForecastData() {
-  return forecastData.slice(0, forecastDaysLimit);
+  return (isCarbonMetric() ? carbonData : forecastData).slice(0, forecastDaysLimit);
+}
+
+function normalizeCarbonSeries(payload) {
+  const raw = payload.data || [];
+  const items = Array.isArray(raw) ? raw : (raw.data || []);
+  return items.map(el => {
+    const intensity = el.intensity || {};
+    const value = (typeof intensity.forecast !== 'undefined' ? intensity.forecast : intensity.actual) ?? null;
+    return { timestamp: new Date(el.from).getTime(), value };
+  });
+}
+
+function buildCarbonData(seriesResults) {
+  const byTime = new Map();
+  seriesResults.forEach(entry => {
+    entry.points.forEach(p => {
+      if (p.value === null || p.value === undefined) return;
+      const d = new Date(p.timestamp);
+      const localDate = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      if (!byTime.has(p.timestamp)) {
+        byTime.set(p.timestamp, {
+          timestamp: p.timestamp,
+          localDate,
+          timeslot: d.toTimeString().slice(0, 5),
+          halfHour: Math.floor((d.getHours() * 60 + d.getMinutes()) / 30),
+          regional_forecast: null,
+          national_forecast: null,
+          regional_historic: null,
+          national_historic: null
+        });
+      }
+      byTime.get(p.timestamp)[entry.key] = p.value;
+    });
+  });
+
+  const reports = Array.from(byTime.values()).sort((a, b) => a.timestamp - b.timestamp);
+  const byDate = {};
+  reports.forEach(r => {
+    if (!byDate[r.localDate]) byDate[r.localDate] = [];
+    byDate[r.localDate].push(r);
+  });
+
+  carbonData = Object.keys(byDate).sort().map((dateStr, index) => ({
+    index,
+    dateStr,
+    formattedDate: formatDateLabel(dateStr),
+    weatherText: 'carbon',
+    reports: byDate[dateStr],
+    visible: true
+  }));
+}
+
+async function fetchCarbonIntensity(postcode) {
+  const clean = postcode.split(' ')[0].trim();
+  const today = new Date().toISOString();
+  const base = 'https://api.carbonintensity.org.uk';
+  const urls = [
+    { key: 'regional_forecast', url: `${base}/regional/intensity/${today}/fw48h/postcode/${clean}` },
+    { key: 'national_forecast', url: `${base}/intensity/${today}/fw48h` },
+    { key: 'regional_historic', url: `${base}/regional/intensity/${today}/pt24h/postcode/${clean}` },
+    { key: 'national_historic', url: `${base}/intensity/${today}/pt24h` }
+  ];
+
+  try {
+    const seriesResults = await Promise.all(urls.map(u =>
+      fetch(u.url).then(res => {
+        if (!res.ok) throw new Error('Carbon intensity request failed');
+        return res.json();
+      }).then(json => ({ key: u.key, points: normalizeCarbonSeries(json) }))
+    ));
+    buildCarbonData(seriesResults);
+    if (isCarbonMetric()) updateDashboard();
+  } catch (err) {
+    console.error(err);
+    carbonData = [];
+    if (isCarbonMetric()) showError('Unable to load Carbon Intensity data for this postcode.');
+  }
 }
 
 function updateRangeBadge() {
@@ -934,6 +1032,7 @@ function initEventListeners() {
     
     updateURLParams();
     fetchForecast(activePostcode);
+    fetchCarbonIntensity(activePostcode);
   });
   
   // Live update indoor temp (debounced or on change)
@@ -1028,6 +1127,7 @@ function startApp() {
 
   // Fetch default forecast
   fetchForecast(activePostcode);
+  fetchCarbonIntensity(activePostcode);
 
   // Create icons
   lucide.createIcons();
