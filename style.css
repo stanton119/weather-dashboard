@@ -538,6 +538,51 @@ header.top-bar {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.carbon-series-legend {
+  display: none;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.carbon-series-legend.visible {
+  display: flex;
+}
+
+.series-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.series-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.series-chip.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: var(--series-color);
+}
+
+.series-chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--series-color);
+  flex-shrink: 0;
+}
+
 /* Summary Grid */
 .summary-grid {
   display: grid;
