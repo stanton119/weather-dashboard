@@ -103,6 +103,12 @@ const METRICS = {
     unit: '%',
     yAxisLabel: 'Chance of Rain (%)',
     getValue: (report) => report.precip_prob
+  },
+  carbon_intensity: {
+    label: 'Carbon Intensity',
+    unit: ' gCO₂/kWh',
+    yAxisLabel: 'Carbon Intensity (gCO₂/kWh)',
+    getValue: (report) => report.regional_forecast ?? report.regional_historic
   }
 };
 
@@ -167,6 +173,11 @@ function syncParamsFromURL() {
   if (mt && METRICS[mt]) {
     activeMetric = mt;
   }
+  const sc = params.get('series');
+  if (sc) {
+    const parts = sc.split(',');
+    carbonSeriesVisible = carbonSeriesVisible.map((v, i) => parts[i] !== '0');
+  }
   
   // Populate form inputs
   postcodeInput.value = activePostcode;
@@ -215,6 +226,7 @@ function updateURLParams() {
   params.set('days', forecastDaysLimit);
   params.set('chartMode', activeChartMode);
   params.set('metric', activeMetric);
+  params.set('series', carbonSeriesVisible.map(v => (v ? '1' : '0')).join(','));
   const newUrl = `${window.location.pathname}?${params.toString()}`;
   window.history.pushState({}, '', newUrl);
 }
@@ -342,6 +354,26 @@ function updateRangeBadge() {
   }
 }
 
+function renderCarbonSeriesLegend() {
+  const el = document.getElementById('carbonSeriesLegend');
+  if (!el) return;
+  el.innerHTML = '';
+  CARBON_SERIES.forEach((s, i) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'series-chip' + (carbonSeriesVisible[i] ? ' active' : '');
+    chip.style.setProperty('--series-color', s.color);
+    chip.innerHTML = `<span class="series-chip-dot"></span>${s.short}`;
+    chip.addEventListener('click', () => {
+      carbonSeriesVisible[i] = !carbonSeriesVisible[i];
+      chip.classList.toggle('active', carbonSeriesVisible[i]);
+      updateURLParams();
+      renderChart();
+    });
+    el.appendChild(chip);
+  });
+}
+
 function processForecastData(data) {
   const forecasts = data.forecasts || [];
   
@@ -467,6 +499,36 @@ function hideError() {
  * Dashboard updates (Chart, Day Cards, Stats Cards)
  */
 function updateDashboard() {
+  if (isCarbonMetric()) {
+    renderCarbonSeriesLegend();
+    const legendEl = document.getElementById('carbonSeriesLegend');
+    if (legendEl) legendEl.classList.add('visible');
+    document.querySelector('.color-legend') && (document.querySelector('.color-legend').style.display = 'none');
+    const summaryGrid = document.getElementById('summaryGrid');
+    const psychroInfo = document.getElementById('psychroInfo');
+    if (summaryGrid) summaryGrid.style.display = 'none';
+    if (psychroInfo) psychroInfo.style.display = 'none';
+    if (rangeSlider && carbonData.length) {
+      rangeSlider.max = carbonData.length;
+      if (forecastDaysLimit > carbonData.length) forecastDaysLimit = carbonData.length;
+      rangeSlider.value = forecastDaysLimit;
+      updateRangeBadge();
+    }
+  } else {
+    const legendEl = document.getElementById('carbonSeriesLegend');
+    if (legendEl) legendEl.classList.remove('visible');
+    document.querySelector('.color-legend') && (document.querySelector('.color-legend').style.display = '');
+    const summaryGrid = document.getElementById('summaryGrid');
+    const psychroInfo = document.getElementById('psychroInfo');
+    if (summaryGrid) summaryGrid.style.display = '';
+    if (psychroInfo) psychroInfo.style.display = '';
+    if (rangeSlider && forecastData.length) {
+      rangeSlider.max = forecastData.length;
+      if (forecastDaysLimit > forecastData.length) forecastDaysLimit = forecastData.length;
+      rangeSlider.value = forecastDaysLimit;
+      updateRangeBadge();
+    }
+  }
   const visibleData = getVisibleForecastData();
   if (visibleData.length === 0) return;
   
@@ -484,7 +546,7 @@ function updateDashboard() {
   // Render subcomponents
   renderDayCards();
   renderChart();
-  calculateInsights();
+  if (!isCarbonMetric()) calculateInsights();
 }
 
 /**
@@ -1098,12 +1160,24 @@ function initEventListeners() {
   
   // Select All/Deselect All buttons
   document.getElementById('btnSelectAll').addEventListener('click', () => {
+    if (isCarbonMetric()) {
+      carbonSeriesVisible = carbonSeriesVisible.map(() => true);
+      renderCarbonSeriesLegend();
+      renderChart();
+      return;
+    }
     getVisibleForecastData().forEach(day => day.visible = true);
     document.querySelectorAll('.day-card').forEach(card => card.classList.add('active'));
     updateChartVisibility();
   });
 
   document.getElementById('btnDeselectAll').addEventListener('click', () => {
+    if (isCarbonMetric()) {
+      carbonSeriesVisible = carbonSeriesVisible.map(() => false);
+      renderCarbonSeriesLegend();
+      renderChart();
+      return;
+    }
     getVisibleForecastData().forEach(day => day.visible = false);
     document.querySelectorAll('.day-card').forEach(card => card.classList.remove('active'));
     updateChartVisibility();
