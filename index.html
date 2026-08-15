@@ -123,6 +123,14 @@
               <div style="font-size: 11px; opacity: 0.7;">Probability of rain</div>
             </div>
           </button>
+
+          <button type="button" class="metric-btn" data-metric="carbon_intensity">
+            <i data-lucide="leaf"></i>
+            <div>
+              <div style="font-weight: 600;">Carbon Intensity</div>
+              <div style="font-size: 11px; opacity: 0.7;">Forecasted gCO₂/kWh</div>
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -183,6 +191,7 @@
           <button class="btn-secondary" id="btnDeselectAll">
             <i data-lucide="square"></i> Hide All
           </button>
+          <div id="carbonSeriesLegend" class="carbon-series-legend"></div>
         </div>
       </div>
       <div class="chart-container">
@@ -206,7 +215,7 @@
     </div>
 
     <!-- Insights Grid -->
-    <div class="summary-grid">
+    <div class="summary-grid" id="summaryGrid">
       <div class="glass-card insight-card">
         <div class="insight-icon temp">
           <i data-lucide="thermometer-sun"></i>
@@ -253,7 +262,7 @@
     </div>
 
     <!-- Psychrometrics Info Box -->
-    <div class="glass-card info-box">
+    <div class="glass-card info-box" id="psychroInfo">
       <i data-lucide="info" style="width: 20px; height: 20px;"></i>
       <div>
         <p><strong>Indoor Relative Humidity Calculation:</strong> Inside humidity is calculated dynamically based on vapor pressure saturation formulas (psychrometrics). Standardizing air temp indoors to your target temperature (e.g. 23°C) alters the capacity of air to hold moisture. High indoor humidity levels (&gt;60%) over sustained periods can lead to dampness, condensation, and structural mold risk.</p>
