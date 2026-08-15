@@ -9,6 +9,7 @@ let activeMetric = 'outside_temp'; // Current metric shown on Y axis
 let activePostcode = 'KT4';
 let activeIndoorTemp = 23;
 let forecastDaysLimit = 7; // Limit for forecast days to show (default 7)
+let carbonDaysLimit = 3;
 let activeChartMode = 'overlay'; // Chart display mode: 'overlay' or 'sequence'
 let chartInstance = null;
 let highlightedDayIndex = null; // Currently highlighted day index
@@ -234,6 +235,12 @@ function updateURLParams() {
 /**
  * Get formatted Date labels for readability (e.g. "Mon, Jul 6")
  */
+function isTodayDateStr(dateStr) {
+  const d = new Date();
+  const today = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+  return dateStr === today;
+}
+
 function formatDateLabel(dateStr) {
   const dateObj = new Date(dateStr);
   if (isNaN(dateObj)) return dateStr;
@@ -268,7 +275,7 @@ async function fetchForecast(postcode) {
 }
 
 function getVisibleForecastData() {
-  return (isCarbonMetric() ? carbonData : forecastData).slice(0, forecastDaysLimit);
+  return (isCarbonMetric() ? carbonData : forecastData).slice(0, isCarbonMetric() ? carbonDaysLimit : forecastDaysLimit);
 }
 
 function normalizeCarbonSeries(payload) {
@@ -349,8 +356,9 @@ async function fetchCarbonIntensity(postcode) {
 }
 
 function updateRangeBadge() {
+  const limit = isCarbonMetric() ? carbonDaysLimit : forecastDaysLimit;
   if (rangeValueBadge) {
-    rangeValueBadge.textContent = `${forecastDaysLimit} Day${forecastDaysLimit > 1 ? 's' : ''}`;
+    rangeValueBadge.textContent = `${limit} Day${limit > 1 ? 's' : ''}`;
   }
 }
 
@@ -510,8 +518,8 @@ function updateDashboard() {
     if (psychroInfo) psychroInfo.style.display = 'none';
     if (rangeSlider && carbonData.length) {
       rangeSlider.max = carbonData.length;
-      if (forecastDaysLimit > carbonData.length) forecastDaysLimit = carbonData.length;
-      rangeSlider.value = forecastDaysLimit;
+      if (carbonDaysLimit > carbonData.length) carbonDaysLimit = carbonData.length;
+      rangeSlider.value = carbonDaysLimit;
       updateRangeBadge();
     }
   } else {
@@ -616,7 +624,7 @@ function renderDayCards() {
     const metricRangeHtml = getDayMetricRange(day, activeMetric);
     
     card.innerHTML = `
-      <div class="day-name">${i === 0 ? 'Today' : new Date(day.dateStr).toLocaleDateString('en-GB', { weekday: 'short' })}</div>
+      <div class="day-name">${isTodayDateStr(day.dateStr) ? 'Today' : new Date(day.dateStr).toLocaleDateString('en-GB', { weekday: 'short' })}</div>
       <div class="day-date">${new Date(day.dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
       <span class="day-weather-icon">${icon}</span>
       <div class="day-temp-range">
@@ -1241,7 +1249,11 @@ function initEventListeners() {
   // Range slider interaction
   if (rangeSlider) {
     rangeSlider.addEventListener('input', () => {
-      forecastDaysLimit = parseInt(rangeSlider.value);
+      if (isCarbonMetric()) {
+        carbonDaysLimit = parseInt(rangeSlider.value);
+      } else {
+        forecastDaysLimit = parseInt(rangeSlider.value);
+      }
       updateRangeBadge();
       updateURLParams();
       updateDashboard();
@@ -1290,6 +1302,7 @@ function initEventListeners() {
       carbonSeriesVisible = carbonSeriesVisible.map(() => true);
       renderCarbonSeriesLegend();
       renderChart();
+      updateURLParams();
       return;
     }
     getVisibleForecastData().forEach(day => day.visible = true);
@@ -1302,6 +1315,7 @@ function initEventListeners() {
       carbonSeriesVisible = carbonSeriesVisible.map(() => false);
       renderCarbonSeriesLegend();
       renderChart();
+      updateURLParams();
       return;
     }
     getVisibleForecastData().forEach(day => day.visible = false);
