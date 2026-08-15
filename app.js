@@ -181,7 +181,10 @@ function syncParamsFromURL() {
 function updateIndoorTempPanel() {
   const panel = document.getElementById('indoorTempPanel');
   if (!panel) return;
-  panel.classList.toggle('open', activeMetric === 'inside_humidity');
+  const isOpen = activeMetric === 'inside_humidity';
+  panel.classList.toggle('open', isOpen);
+  const btn = document.querySelector('.metric-btn[data-metric="inside_humidity"]');
+  if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 
 function updateURLParams() {
