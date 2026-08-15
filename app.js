@@ -688,7 +688,64 @@ function getWeatherIcon(text) {
 function getChartDatasets() {
   const metricConfig = METRICS[activeMetric];
   const visibleData = getVisibleForecastData();
-  
+
+  if (isCarbonMetric() && activeChartMode === 'sequence') {
+    carbonSequenceReports = [];
+    const labels = [];
+    visibleData.forEach(day => {
+      if (!day.visible) return;
+      day.reports.forEach(r => {
+        labels.push(`${day.formattedDate} ${r.timeslot}`);
+        carbonSequenceReports.push({ day, report: r });
+      });
+    });
+
+    const datasets = CARBON_SERIES.map((s, si) => ({
+      label: s.label,
+      data: carbonSequenceReports.map(item => item.report[s.key]),
+      borderColor: s.color,
+      backgroundColor: 'transparent',
+      borderDash: s.dash,
+      borderWidth: 2,
+      tension: 0.3,
+      spanGaps: true,
+      hidden: !carbonSeriesVisible[si],
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      pointBackgroundColor: s.color
+    }));
+
+    return { labels, datasets };
+  }
+
+  if (isCarbonMetric()) {
+    const datasets = [];
+    visibleData.forEach(day => {
+      CARBON_SERIES.forEach((s, si) => {
+        const arr = Array(48).fill(null);
+        day.reports.forEach(r => {
+          if (r[s.key] !== null && r[s.key] !== undefined) arr[r.halfHour] = r[s.key];
+        });
+        datasets.push({
+          label: `${day.formattedDate} · ${s.short}`,
+          data: arr,
+          borderColor: s.color,
+          backgroundColor: 'transparent',
+          borderDash: s.dash,
+          borderWidth: 2,
+          tension: 0.3,
+          spanGaps: true,
+          hidden: !day.visible || !carbonSeriesVisible[si],
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointBackgroundColor: s.color
+        });
+      });
+    });
+
+    return { labels: HALF_HOUR_LABELS, datasets };
+  }
+
   if (activeChartMode === 'sequence') {
     const dataArray = [];
     visibleData.forEach(day => {
@@ -697,7 +754,7 @@ function getChartDatasets() {
         dataArray.push(metricConfig.getValue(report));
       });
     });
-    
+
     return [{
       label: `${metricConfig.label} Sequence`,
       data: dataArray,
@@ -721,16 +778,14 @@ function getChartDatasets() {
     }];
   } else {
     return visibleData.map((day, i) => {
-      // Map report data to hourly array
       const dataArray = Array(24).fill(null);
       day.reports.forEach(report => {
         dataArray[report.hour] = metricConfig.getValue(report);
       });
-      
-      // Compute styling: handle dimmed or highlighted hover states
+
       let colorOpacity = 0.8;
       let borderWidth = 2;
-      
+
       if (highlightedDayIndex !== null) {
         if (highlightedDayIndex === i) {
           colorOpacity = 1.0;
@@ -740,9 +795,9 @@ function getChartDatasets() {
           borderWidth = 1.5;
         }
       }
-      
+
       const lineColor = getDayColor(i, visibleData.length, colorOpacity);
-      
+
       return {
         label: day.formattedDate,
         data: dataArray,
@@ -758,7 +813,6 @@ function getChartDatasets() {
         pointHoverBorderColor: lineColor,
         pointHoverBorderWidth: 2,
         pointRadius: (context) => {
-          // Only show small dots on data points, highlight when hovered
           return context.dataset.hidden ? 0 : 2;
         }
       };
@@ -777,12 +831,15 @@ function renderChart() {
   if (chartInstance) {
     chartInstance.destroy();
   }
-  
+
+  const isCarbon = isCarbonMetric();
+  const built = isCarbon ? datasets : null;
+
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: activeChartMode === 'sequence' ? getSequenceLabels() : HOURS,
-      datasets: datasets
+      labels: built ? built.labels : (activeChartMode === 'sequence' ? getSequenceLabels() : HOURS),
+      datasets: built ? built.datasets : datasets
     },
     options: {
       responsive: true,
@@ -817,11 +874,13 @@ function renderChart() {
             callback: function(val, index) {
               const label = this.getLabelForValue(val);
               if (activeChartMode === 'sequence') {
-                if (label && label.endsWith('12:00')) {
-                  return label.split(' ')[0];
+                if (isCarbon && label) {
+                  return label.endsWith(':00') ? label.substring(label.length - 5) : '';
                 }
+                if (label && label.endsWith('12:00')) return label.split(' ')[0];
                 return '';
               } else {
+                if (isCarbon) return index % 4 === 0 ? label : '';
                 return index % 3 === 0 ? label : '';
               }
             }
@@ -850,20 +909,20 @@ function renderChart() {
 
 function updateChartVisibility() {
   if (!chartInstance) return;
-  if (activeChartMode === 'sequence') {
+  if (isCarbonMetric() || activeChartMode === 'sequence') {
     renderChart();
   } else {
     const visibleData = getVisibleForecastData();
     visibleData.forEach((day, i) => {
       chartInstance.setDatasetVisibility(i, day.visible);
     });
-    chartInstance.update('none'); // Update without full animation for performance
+    chartInstance.update('none');
   }
 }
 
 function updateChartLineStyle() {
   if (!chartInstance) return;
-  if (activeChartMode === 'sequence') return;
+  if (isCarbonMetric() || activeChartMode === 'sequence') return;
   
   const datasets = getChartDatasets();
   datasets.forEach((dataset, i) => {
@@ -896,6 +955,63 @@ function handleCustomTooltip(context) {
   // Grab the hour index
   const hourIndex = dataPoints[0].dataIndex;
   let html = '';
+  
+  if (activeMetric === 'carbon_intensity') {
+    if (activeChartMode === 'sequence') {
+      const item = carbonSequenceReports[hourIndex];
+      if (!item) return;
+      const { day, report } = item;
+      let rows = '';
+      CARBON_SERIES.forEach(s => {
+        const v = report[s.key];
+        if (v !== null && v !== undefined) {
+          rows += `<div class="tooltip-row" style="color: ${s.color};"><span>${s.label}</span><span class="tooltip-value">${Math.round(v)} gCO₂/kWh</span></div>`;
+        }
+      });
+      html = `
+        <div class="tooltip-header">
+          <span>${day.formattedDate}</span>
+          <span>${report.timeslot}</span>
+        </div>
+        ${rows}
+      `;
+    } else {
+      html = `<div class="tooltip-header"><span>Time: ${HALF_HOUR_LABELS[hourIndex]}</span></div>`;
+      const visibleData = getVisibleForecastData();
+      visibleData.forEach(day => {
+        if (!day.visible) return;
+        const report = day.reports.find(r => r.halfHour === hourIndex);
+        if (!report) return;
+        CARBON_SERIES.forEach(s => {
+          const v = report[s.key];
+          if (v !== null && v !== undefined) {
+            html += `
+              <div class="tooltip-row" style="color: ${s.color};">
+                <span class="tooltip-label">${day.formattedDate} ${s.short}</span>
+                <span class="tooltip-value">${Math.round(v)} gCO₂/kWh</span>
+              </div>
+            `;
+          }
+        });
+      });
+    }
+    customTooltip.innerHTML = html;
+    const position = context.chart.canvas.getBoundingClientRect();
+    const tooltipWidth = customTooltip.offsetWidth || 160;
+    const caretAbsLeft = position.left + tooltipModel.caretX;
+    const gap = 15;
+    let left;
+    if (caretAbsLeft + gap + tooltipWidth > window.innerWidth) {
+      left = caretAbsLeft - tooltipWidth - gap;
+    } else {
+      left = caretAbsLeft + gap;
+    }
+    left = Math.max(8, left);
+    customTooltip.style.opacity = 1;
+    customTooltip.style.left = left + window.pageXOffset + 'px';
+    customTooltip.style.top = position.top + window.pageYOffset + tooltipModel.caretY - 20 + 'px';
+    return;
+  }
   
   if (activeChartMode === 'sequence') {
     const visibleData = getVisibleForecastData();
