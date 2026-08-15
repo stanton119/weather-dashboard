@@ -553,6 +553,16 @@ function updateDashboard() {
  * Render horizontal scrolling list of day cards
  */
 function getDayMetricRange(day, metric) {
+  if (metric === 'carbon_intensity') {
+    const vals = [];
+    day.reports.forEach(r => {
+      CARBON_SERIES.forEach(s => {
+        if (r[s.key] !== null && r[s.key] !== undefined) vals.push(r[s.key]);
+      });
+    });
+    if (vals.length === 0) return '--';
+    return `<span class="day-temp-max">${Math.round(Math.max(...vals))}</span> <span class="day-temp-min">${Math.round(Math.min(...vals))} gCO₂/kWh</span>`;
+  }
   const metricConfig = METRICS[metric];
   const values = day.reports
     .map(r => metricConfig.getValue(r))
@@ -602,7 +612,7 @@ function renderDayCards() {
     card.style.setProperty('--day-color', getDayColor(i, visibleData.length));
     
     // Select appropriate weather emoji icon
-    const icon = getWeatherIcon(day.weatherText);
+    const icon = isCarbonMetric() ? '🍃' : getWeatherIcon(day.weatherText);
     const metricRangeHtml = getDayMetricRange(day, activeMetric);
     
     card.innerHTML = `
