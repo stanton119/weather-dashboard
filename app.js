@@ -175,6 +175,13 @@ function syncParamsFromURL() {
       btn.classList.toggle('active', btn.dataset.metric === activeMetric);
     });
   }
+  updateIndoorTempPanel();
+}
+
+function updateIndoorTempPanel() {
+  const panel = document.getElementById('indoorTempPanel');
+  if (!panel) return;
+  panel.classList.toggle('open', activeMetric === 'inside_humidity');
 }
 
 function updateURLParams() {
@@ -983,6 +990,7 @@ function initEventListeners() {
       activeMetric = btn.dataset.metric;
       updateURLParams();
       updateDashboard();
+      updateIndoorTempPanel();
     });
   });
   
