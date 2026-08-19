@@ -31,6 +31,7 @@ const CARBON_SERIES = [
 ];
 
 let carbonData = [];
+let carbonLoading = false;
 let carbonSeriesVisible = [true, true, true, true];
 let carbonSequenceReports = [];
 
@@ -53,6 +54,7 @@ const dayCardsList = document.getElementById('dayCardsList');
 const errorBanner = document.getElementById('errorBanner');
 const errorMessage = document.getElementById('errorMessage');
 const loadingOverlay = document.getElementById('loadingOverlay');
+const chartLoadingOverlay = document.getElementById('chartLoadingOverlay');
 const customTooltip = document.getElementById('chartjs-tooltip');
 const btnModeOverlay = document.getElementById('btnModeOverlay');
 const btnModeSequence = document.getElementById('btnModeSequence');
@@ -339,6 +341,7 @@ async function fetchCarbonIntensity(postcode) {
     { key: 'national_historic', url: `${base}/intensity/${today}/pt24h` }
   ];
 
+  carbonLoading = true;
   try {
     const seriesResults = await Promise.all(urls.map(u =>
       fetch(u.url).then(res => {
@@ -352,6 +355,9 @@ async function fetchCarbonIntensity(postcode) {
     console.error(err);
     carbonData = [];
     if (isCarbonMetric()) showError('Unable to load Carbon Intensity data for this postcode.');
+  } finally {
+    carbonLoading = false;
+    setChartLoading(false);
   }
 }
 
@@ -503,6 +509,12 @@ function hideError() {
   errorBanner.style.display = 'none';
 }
 
+function setChartLoading(show) {
+  if (chartLoadingOverlay) {
+    chartLoadingOverlay.classList.toggle('visible', show);
+  }
+}
+
 /**
  * Dashboard updates (Chart, Day Cards, Stats Cards)
  */
@@ -537,6 +549,7 @@ function updateDashboard() {
       updateRangeBadge();
     }
   }
+  setChartLoading(isCarbonMetric() && carbonLoading);
   const visibleData = getVisibleForecastData();
   if (visibleData.length === 0) return;
   
