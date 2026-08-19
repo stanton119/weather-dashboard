@@ -342,6 +342,7 @@ async function fetchCarbonIntensity(postcode) {
   ];
 
   carbonLoading = true;
+  setChartLoading(isCarbonMetric());
   try {
     const seriesResults = await Promise.all(urls.map(u =>
       fetch(u.url).then(res => {
