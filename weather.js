@@ -145,6 +145,112 @@ export function getDayMetricRange(day, metric) {
   return `<span class="day-temp-max">${Math.round(max)}</span> <span class="day-temp-min">${Math.round(min)}</span>`;
 }
 
+export function normalizeCarbonSeries(payload) {
+  const raw = payload.data || [];
+  const items = Array.isArray(raw) ? raw : (raw.data || []);
+  return items.map(el => {
+    const intensity = el.intensity || {};
+    const value = (typeof intensity.forecast !== 'undefined' ? intensity.forecast : intensity.actual) ?? null;
+    return { timestamp: new Date(el.from).getTime(), value };
+  });
+}
+
+export function buildCarbonData(seriesResults) {
+  const byTime = new Map();
+  seriesResults.forEach(entry => {
+    entry.points.forEach(p => {
+      if (p.value === null || p.value === undefined) return;
+      const d = new Date(p.timestamp);
+      const localDate = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      if (!byTime.has(p.timestamp)) {
+        byTime.set(p.timestamp, {
+          timestamp: p.timestamp,
+          localDate,
+          timeslot: d.toTimeString().slice(0, 5),
+          halfHour: Math.floor((d.getHours() * 60 + d.getMinutes()) / 30),
+          regional_forecast: null,
+          national_forecast: null,
+          regional_historic: null,
+          national_historic: null
+        });
+      }
+      byTime.get(p.timestamp)[entry.key] = p.value;
+    });
+  });
+  const reports = Array.from(byTime.values()).sort((a, b) => a.timestamp - b.timestamp);
+  const byDate = {};
+  reports.forEach(r => {
+    if (!byDate[r.localDate]) byDate[r.localDate] = [];
+    byDate[r.localDate].push(r);
+  });
+  return Object.keys(byDate).sort().map((dateStr, index) => ({
+    index,
+    dateStr,
+    formattedDate: formatDateLabel(dateStr),
+    weatherText: 'carbon',
+    reports: byDate[dateStr],
+    visible: true
+  }));
+}
+
+export function processForecastData(data, indoorTemp) {
+  const forecasts = data.forecasts || [];
+  const reportsByDate = {};
+  const summaryByDate = {};
+  forecasts.forEach(dayObj => {
+    const summaryReport = (dayObj.summary && dayObj.summary.report) || {};
+    if (summaryReport.localDate) summaryByDate[summaryReport.localDate] = summaryReport;
+    const detailed = dayObj.detailed || {};
+    const reports = detailed.reports || [];
+    reports.forEach(r => {
+      if (!r.localDate) return;
+      if (!reportsByDate[r.localDate]) reportsByDate[r.localDate] = [];
+      reportsByDate[r.localDate].push(r);
+    });
+  });
+  const sortedDates = Object.keys(reportsByDate).sort();
+  return sortedDates.map((dateStr, index) => {
+    const reportsForDate = reportsByDate[dateStr];
+    const parsedReports = reportsForDate.map(r => {
+      const outside_temp = r.temperatureC;
+      const outside_humidity = r.humidity;
+      const inside_humidity = calculateIndoorHumidity(outside_temp, outside_humidity, indoorTemp);
+      return {
+        hour: parseInt(r.timeslot.split(':')[0]),
+        timeslot: r.timeslot,
+        localDate: r.localDate,
+        outside_temp,
+        outside_humidity,
+        inside_humidity,
+        feels_like: r.feelsLikeTemperatureC,
+        wind_speed: r.windSpeedKph,
+        wind_direction: r.windDirectionAbbreviation,
+        precip_prob: r.precipitationProbabilityInPercent,
+        weather_text: r.weatherTypeText || 'Unknown'
+      };
+    }).sort((a, b) => a.hour - b.hour);
+    const summaryReport = summaryByDate[dateStr] || {};
+    const temps = parsedReports.map(r => r.outside_temp).filter(t => t !== null && t !== undefined);
+    const maxTemp = summaryReport.maxTempC !== null && summaryReport.maxTempC !== undefined ?
+      summaryReport.maxTempC : (temps.length ? Math.max(...temps) : '--');
+    const minTemp = summaryReport.minTempC !== null && summaryReport.minTempC !== undefined ?
+      summaryReport.minTempC : (temps.length ? Math.min(...temps) : '--');
+    const midIndex = Math.floor(parsedReports.length / 2);
+    const weatherText = summaryReport.weatherTypeText ||
+      (parsedReports[midIndex] && parsedReports[midIndex].weather_text) || 'Cloudy';
+    return {
+      index,
+      dateStr,
+      formattedDate: formatDateLabel(dateStr),
+      maxTemp,
+      minTemp,
+      weatherText,
+      reports: parsedReports,
+      visible: true
+    };
+  });
+}
+
 // Expose as globals for classic-script app.js, which resolves these names bare.
 if (typeof window !== 'undefined') {
   Object.assign(window, {
@@ -157,6 +263,9 @@ if (typeof window !== 'undefined') {
     isTodayDateStr,
     formatDateLabel,
     getWeatherIcon,
-    getDayMetricRange
+    getDayMetricRange,
+    normalizeCarbonSeries,
+    buildCarbonData,
+    processForecastData
   });
 }

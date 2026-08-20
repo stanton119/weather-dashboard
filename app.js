@@ -149,6 +149,18 @@ function updateURLParams() {
 /**
  * Fetch and process BBC aggregated weather forecast data
  */
+function syncRangeSliderLimits() {
+  const totalDays = forecastData.length;
+  if (rangeSlider) {
+    rangeSlider.max = totalDays;
+    if (forecastDaysLimit > totalDays) {
+      forecastDaysLimit = totalDays;
+    }
+    rangeSlider.value = forecastDaysLimit;
+  }
+  updateRangeBadge();
+}
+
 async function fetchForecast(postcode) {
   // Format postcode to get outcode
   const cleanPostcode = postcode.split(' ')[0].trim().toLowerCase();
@@ -163,7 +175,8 @@ async function fetchForecast(postcode) {
       throw new Error(`Failed to fetch forecast for postcode "${postcode.toUpperCase()}".`);
     }
     const data = await response.json();
-    processForecastData(data);
+    forecastData = processForecastData(data, activeIndoorTemp);
+    syncRangeSliderLimits();
     updateDashboard();
   } catch (error) {
     console.error(error);
@@ -175,56 +188,6 @@ async function fetchForecast(postcode) {
 
 function getVisibleForecastData() {
   return (isCarbonMetric() ? carbonData : forecastData).slice(0, isCarbonMetric() ? carbonDaysLimit : forecastDaysLimit);
-}
-
-function normalizeCarbonSeries(payload) {
-  const raw = payload.data || [];
-  const items = Array.isArray(raw) ? raw : (raw.data || []);
-  return items.map(el => {
-    const intensity = el.intensity || {};
-    const value = (typeof intensity.forecast !== 'undefined' ? intensity.forecast : intensity.actual) ?? null;
-    return { timestamp: new Date(el.from).getTime(), value };
-  });
-}
-
-function buildCarbonData(seriesResults) {
-  const byTime = new Map();
-  seriesResults.forEach(entry => {
-    entry.points.forEach(p => {
-      if (p.value === null || p.value === undefined) return;
-      const d = new Date(p.timestamp);
-      const localDate = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
-      if (!byTime.has(p.timestamp)) {
-        byTime.set(p.timestamp, {
-          timestamp: p.timestamp,
-          localDate,
-          timeslot: d.toTimeString().slice(0, 5),
-          halfHour: Math.floor((d.getHours() * 60 + d.getMinutes()) / 30),
-          regional_forecast: null,
-          national_forecast: null,
-          regional_historic: null,
-          national_historic: null
-        });
-      }
-      byTime.get(p.timestamp)[entry.key] = p.value;
-    });
-  });
-
-  const reports = Array.from(byTime.values()).sort((a, b) => a.timestamp - b.timestamp);
-  const byDate = {};
-  reports.forEach(r => {
-    if (!byDate[r.localDate]) byDate[r.localDate] = [];
-    byDate[r.localDate].push(r);
-  });
-
-  carbonData = Object.keys(byDate).sort().map((dateStr, index) => ({
-    index,
-    dateStr,
-    formattedDate: formatDateLabel(dateStr),
-    weatherText: 'carbon',
-    reports: byDate[dateStr],
-    visible: true
-  }));
 }
 
 async function fetchCarbonIntensity(postcode) {
@@ -247,7 +210,7 @@ async function fetchCarbonIntensity(postcode) {
         return res.json();
       }).then(json => ({ key: u.key, points: normalizeCarbonSeries(json) }))
     ));
-    buildCarbonData(seriesResults);
+    carbonData = buildCarbonData(seriesResults);
     if (isCarbonMetric()) updateDashboard();
   } catch (err) {
     console.error(err);
@@ -284,96 +247,6 @@ function renderCarbonSeriesLegend() {
     });
     el.appendChild(chip);
   });
-}
-
-function processForecastData(data) {
-  const forecasts = data.forecasts || [];
-  
-  // Group all hourly reports by their calendar date (localDate)
-  const reportsByDate = {};
-  const summaryByDate = {};
-  
-  forecasts.forEach(dayObj => {
-    const summaryReport = (dayObj.summary && dayObj.summary.report) || {};
-    if (summaryReport.localDate) {
-      summaryByDate[summaryReport.localDate] = summaryReport;
-    }
-    
-    const detailed = dayObj.detailed || {};
-    const reports = detailed.reports || [];
-    
-    reports.forEach(r => {
-      if (!r.localDate) return;
-      if (!reportsByDate[r.localDate]) {
-        reportsByDate[r.localDate] = [];
-      }
-      reportsByDate[r.localDate].push(r);
-    });
-  });
-  
-  // Sort the calendar dates chronologically
-  const sortedDates = Object.keys(reportsByDate).sort();
-  
-  forecastData = sortedDates.map((dateStr, index) => {
-    const reportsForDate = reportsByDate[dateStr];
-    
-    // Sort reports for this specific date by hour chronologically
-    const parsedReports = reportsForDate.map(r => {
-      const outside_temp = r.temperatureC;
-      const outside_humidity = r.humidity;
-      const inside_humidity = calculateIndoorHumidity(outside_temp, outside_humidity, activeIndoorTemp);
-      
-      return {
-        hour: parseInt(r.timeslot.split(':')[0]),
-        timeslot: r.timeslot,
-        localDate: r.localDate,
-        outside_temp,
-        outside_humidity,
-        inside_humidity,
-        feels_like: r.feelsLikeTemperatureC,
-        wind_speed: r.windSpeedKph,
-        wind_direction: r.windDirectionAbbreviation,
-        precip_prob: r.precipitationProbabilityInPercent,
-        weather_text: r.weatherTypeText || 'Unknown'
-      };
-    }).sort((a, b) => a.hour - b.hour);
-    
-    const summaryReport = summaryByDate[dateStr] || {};
-    const temps = parsedReports.map(r => r.outside_temp).filter(t => t !== null && t !== undefined);
-    
-    // Calculate fallback values for max/min if summary isn't available for this date
-    const maxTemp = summaryReport.maxTempC !== null && summaryReport.maxTempC !== undefined ? 
-      summaryReport.maxTempC : (temps.length ? Math.max(...temps) : '--');
-    const minTemp = summaryReport.minTempC !== null && summaryReport.minTempC !== undefined ? 
-      summaryReport.minTempC : (temps.length ? Math.min(...temps) : '--');
-    
-    // Fallback weather text to midday forecast if summary isn't available
-    const midIndex = Math.floor(parsedReports.length / 2);
-    const weatherText = summaryReport.weatherTypeText || 
-      (parsedReports[midIndex] && parsedReports[midIndex].weather_text) || 'Cloudy';
-    
-    return {
-      index,
-      dateStr,
-      formattedDate: formatDateLabel(dateStr),
-      maxTemp,
-      minTemp,
-      weatherText,
-      reports: parsedReports,
-      visible: true
-    };
-  });
-
-  // Set range slider limit based on data
-  const totalDays = forecastData.length;
-  if (rangeSlider) {
-    rangeSlider.max = totalDays;
-    if (forecastDaysLimit > totalDays) {
-      forecastDaysLimit = totalDays;
-    }
-    rangeSlider.value = forecastDaysLimit;
-  }
-  updateRangeBadge();
 }
 
 /**
