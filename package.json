@@ -2,9 +2,13 @@
   "name": "aerotemp-weather-dashboard",
   "version": "1.0.0",
   "description": "A high-fidelity weather and humidity trend visualization dashboard",
+  "type": "module",
   "main": "index.html",
   "scripts": {
-    "dev": "npx -y http-server -p 8080 -o"
+    "dev": "npx -y http-server -p 8080 -o",
+    "test": "node --test test/unit/",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
   },
   "keywords": [
     "weather",
