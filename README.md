@@ -46,3 +46,11 @@ $$RH_{in} = \frac{(T_{in} + 273.15) \times RH_{out} \times p_{sat}(T_{out})}{(T_
    ```
 3. Open `http://localhost:8080` in your web browser. Or pass URL parameters directly:
    `http://localhost:8080/?postCode=KT4&indoorTemp=23`
+
+## Testing
+
+- **Unit tests** (Node built-in runner, zero dependencies): `npm test`
+- **Browser E2E tests** (Playwright, chromium): `npm run test:e2e`
+- **Both**: `npm run test:all`
+
+E2E tests hit the live BBC weather API and skip (never fail) when it is unreachable. CI runs on push to `main` and on pull requests (see `.github/workflows/test.yml`).
