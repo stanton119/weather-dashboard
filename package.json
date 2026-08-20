@@ -21,6 +21,7 @@
   "author": "Antigravity Pair Programmer",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "http-server": "^14.1.1"
   }
 }
