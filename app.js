@@ -876,78 +876,31 @@ function handleCustomTooltip(context) {
  * Compute key dashboard insights
  */
 function calculateInsights() {
-  let peakTemp = -Infinity;
-  let peakTempTime = '';
-  let peakIndoorRH = -Infinity;
-  let peakIndoorRHTime = '';
-  let peakWind = -Infinity;
-  let peakWindTime = '';
-  
-  let moldSustainedHours = 0; // Number of hours with indoor humidity > 60%
-  let totalHours = 0;
+  const insights = computeInsights(getVisibleForecastData());
 
-  const visibleData = getVisibleForecastData();
-  visibleData.forEach(day => {
-    day.reports.forEach(r => {
-      totalHours++;
-      
-      // Warmest peak
-      if (r.outside_temp !== null && r.outside_temp > peakTemp) {
-        peakTemp = r.outside_temp;
-        peakTempTime = `${day.formattedDate} @ ${r.timeslot}`;
-      }
-      
-      // Peak Indoor Humidity
-      if (r.inside_humidity !== null && r.inside_humidity > peakIndoorRH) {
-        peakIndoorRH = r.inside_humidity;
-        peakIndoorRHTime = `${day.formattedDate} @ ${r.timeslot}`;
-      }
-      
-      // Peak Wind Speed
-      if (r.wind_speed !== null && r.wind_speed > peakWind) {
-        peakWind = r.wind_speed;
-        peakWindTime = `${day.formattedDate} @ ${r.timeslot} (${r.wind_direction})`;
-      }
-      
-      // Mold risk (sustained RH > 60%)
-      if (r.inside_humidity !== null && r.inside_humidity > 60) {
-        moldSustainedHours++;
-      }
-    });
-  });
+  if (insights.peakTemp !== -Infinity) {
+    valWarmest.textContent = `${insights.peakTemp}°C`;
+    descWarmest.textContent = insights.peakTempTime;
+  }
 
-  // Warmest
-  if (peakTemp !== -Infinity) {
-    valWarmest.textContent = `${peakTemp}°C`;
-    descWarmest.textContent = peakTempTime;
+  if (insights.peakIndoorRH !== -Infinity) {
+    valMaxIndoorRH.textContent = `${insights.peakIndoorRH}%`;
+    descMaxIndoorRH.textContent = insights.peakIndoorRHTime;
   }
-  
-  // Peak Indoor RH
-  if (peakIndoorRH !== -Infinity) {
-    valMaxIndoorRH.textContent = `${peakIndoorRH}%`;
-    descMaxIndoorRH.textContent = peakIndoorRHTime;
-    
-    // Mold Risk calculations
-    const moldPercentage = (moldSustainedHours / totalHours) * 100;
-    if (peakIndoorRH > 70 && moldPercentage > 15) {
-      valMoldRisk.textContent = 'HIGH';
-      valMoldRisk.style.color = 'var(--danger-color)';
-      descMoldRisk.textContent = `RH > 60% for ${Math.round(moldPercentage)}% of forecast`;
-    } else if (peakIndoorRH > 60 && moldPercentage > 5) {
-      valMoldRisk.textContent = 'MEDIUM';
-      valMoldRisk.style.color = 'var(--warning-color)';
-      descMoldRisk.textContent = `RH > 60% for ${Math.round(moldPercentage)}% of forecast`;
-    } else {
-      valMoldRisk.textContent = 'LOW';
-      valMoldRisk.style.color = 'var(--success-color)';
-      descMoldRisk.textContent = 'Indoor humidity is safe';
-    }
+
+  if (insights.moldRisk !== null) {
+    valMoldRisk.textContent = insights.moldRisk;
+    valMoldRisk.style.color = insights.moldRisk === 'HIGH'
+      ? 'var(--danger-color)'
+      : insights.moldRisk === 'MEDIUM' ? 'var(--warning-color)' : 'var(--success-color)';
+    descMoldRisk.textContent = (insights.moldRisk === 'HIGH' || insights.moldRisk === 'MEDIUM')
+      ? `RH > 60% for ${Math.round(insights.moldPercentage)}% of forecast`
+      : 'Indoor humidity is safe';
   }
-  
-  // Peak Wind Speed
-  if (peakWind !== -Infinity) {
-    valWind.textContent = `${peakWind} km/h`;
-    descWind.textContent = peakWindTime;
+
+  if (insights.peakWind !== -Infinity) {
+    valWind.textContent = `${insights.peakWind} km/h`;
+    descWind.textContent = insights.peakWindTime;
   }
 }
 

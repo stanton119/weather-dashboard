@@ -251,6 +251,60 @@ export function processForecastData(data, indoorTemp) {
   });
 }
 
+export function computeInsights(visibleData) {
+  let peakTemp = -Infinity;
+  let peakTempTime = '';
+  let peakIndoorRH = -Infinity;
+  let peakIndoorRHTime = '';
+  let peakWind = -Infinity;
+  let peakWindTime = '';
+  let moldSustainedHours = 0;
+  let totalHours = 0;
+  visibleData.forEach(day => {
+    day.reports.forEach(r => {
+      totalHours++;
+      if (r.outside_temp !== null && r.outside_temp > peakTemp) {
+        peakTemp = r.outside_temp;
+        peakTempTime = `${day.formattedDate} @ ${r.timeslot}`;
+      }
+      if (r.inside_humidity !== null && r.inside_humidity > peakIndoorRH) {
+        peakIndoorRH = r.inside_humidity;
+        peakIndoorRHTime = `${day.formattedDate} @ ${r.timeslot}`;
+      }
+      if (r.wind_speed !== null && r.wind_speed > peakWind) {
+        peakWind = r.wind_speed;
+        peakWindTime = `${day.formattedDate} @ ${r.timeslot} (${r.wind_direction})`;
+      }
+      if (r.inside_humidity !== null && r.inside_humidity > 60) {
+        moldSustainedHours++;
+      }
+    });
+  });
+  const moldPercentage = totalHours ? (moldSustainedHours / totalHours) * 100 : 0;
+  let moldRisk = null;
+  if (peakIndoorRH !== -Infinity) {
+    if (peakIndoorRH > 70 && moldPercentage > 15) {
+      moldRisk = 'HIGH';
+    } else if (peakIndoorRH > 60 && moldPercentage > 5) {
+      moldRisk = 'MEDIUM';
+    } else {
+      moldRisk = 'LOW';
+    }
+  }
+  return {
+    peakTemp,
+    peakTempTime,
+    peakIndoorRH,
+    peakIndoorRHTime,
+    peakWind,
+    peakWindTime,
+    moldSustainedHours,
+    totalHours,
+    moldPercentage,
+    moldRisk
+  };
+}
+
 // Expose as globals for classic-script app.js, which resolves these names bare.
 if (typeof window !== 'undefined') {
   Object.assign(window, {
@@ -266,6 +320,7 @@ if (typeof window !== 'undefined') {
     getDayMetricRange,
     normalizeCarbonSeries,
     buildCarbonData,
-    processForecastData
+    processForecastData,
+    computeInsights
   });
 }
