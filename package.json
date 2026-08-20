@@ -6,7 +6,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "npx -y http-server -p 8080 -o",
-    "test": "node --test test/unit/",
+    "test": "node --test test/unit/*.test.mjs",
     "test:e2e": "playwright test",
     "test:all": "npm test && npm run test:e2e"
   },
