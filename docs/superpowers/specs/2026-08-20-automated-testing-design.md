@@ -35,9 +35,11 @@ playwright.config.js   Overrides the fetch guard/skip behaviour as needed
 - `normalizeCarbonSeries`, `buildCarbonData`
 - `getDayMetricRange`
 
+The shared constants these functions depend on move with them (they are pure): `TIMELINE_COLORS` (used by `getDayColor`), `METRICS` and `CARBON_SERIES` (used by `getDayMetricRange` and others). `weather.js` defines them under the same global names so remaining `app.js` references keep resolving.
+
 ### Move with a tiny signature change (parameterize what is currently a global)
 
-- `processForecastData(data)` → `processForecastData(data, indoorTemp)` (drops the `activeIndoorTemp` global read; app.js passes it)
+- `processForecastData(data)` → `processForecastData(data, indoorTemp)`: drops the `activeIndoorTemp` global read and now **returns** the processed array. app.js assigns `forecastData = processForecastData(data, activeIndoorTemp)`.
 - New helper `computeInsights(visibleData)` extracted from `calculateInsights` — returns `{ peakTemp, peakTempTime, peakWind, peakIndoorRH, moldSustainedHours, totalHours, moldRisk, ... }`; `calculateInsights` in app.js renders that result into the DOM (mold-risk thresholds become unit-testable)
 
 ### Stays in app.js (DOM coupled)
