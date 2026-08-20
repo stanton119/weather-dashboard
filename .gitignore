@@ -2,6 +2,9 @@
 # Superpowers brainstorm session artifacts
 .superpowers/
 
+# Node dependencies
+node_modules/
+
 # Isolated worktrees
 .worktrees/
 

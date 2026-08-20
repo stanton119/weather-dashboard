@@ -146,9 +146,6 @@ function updateURLParams() {
   window.history.pushState({}, '', newUrl);
 }
 
-/**
- * Fetch and process BBC aggregated weather forecast data
- */
 function syncRangeSliderLimits() {
   const totalDays = forecastData.length;
   if (rangeSlider) {
@@ -161,6 +158,9 @@ function syncRangeSliderLimits() {
   updateRangeBadge();
 }
 
+/**
+ * Fetch and process BBC aggregated weather forecast data
+ */
 async function fetchForecast(postcode) {
   // Format postcode to get outcode
   const cleanPostcode = postcode.split(' ')[0].trim().toLowerCase();

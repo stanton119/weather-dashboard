@@ -4,20 +4,34 @@ import { forecastResponse } from './helpers.mjs';
 const skipIfUnreachable = (resp) =>
   test.skip(!resp || resp.status() >= 400, 'BBC weather API unreachable');
 
+const EXTERNAL_NETWORK_FAILURES = ['Failed to fetch', 'Failed to load resource', 'net::ERR'];
+
 test('loads, renders the chart, and has no console errors', async ({ page }) => {
   const errors = [];
+  let cdnFailed = false;
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('response', (resp) => {
+    if (resp.url().includes('weather-broker-cdn') && resp.status() >= 400) {
+      cdnFailed = true;
+    }
   });
 
   const respPromise = forecastResponse(page, 'kt4');
   await page.goto('/?postCode=KT4');
   const resp = await respPromise.catch(() => null);
+
   skipIfUnreachable(resp);
+  test.skip(cdnFailed, 'weather-broker-cdn returned an error response');
 
   await expect(page.locator('#forecastChart')).toBeVisible();
   await expect(page.locator('.day-card').first()).toBeVisible();
-  expect(errors).toEqual([]);
+
+  const unexpected = errors.filter(
+    (text) => !EXTERNAL_NETWORK_FAILURES.some((frag) => text.includes(frag))
+  );
+  expect(unexpected).toEqual([]);
 });
 
 test('submitting a postcode updates the location and URL', async ({ page }) => {

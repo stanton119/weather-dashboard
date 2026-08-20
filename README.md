@@ -53,4 +53,6 @@ $$RH_{in} = \frac{(T_{in} + 273.15) \times RH_{out} \times p_{sat}(T_{out})}{(T_
 - **Browser E2E tests** (Playwright, chromium): `npm run test:e2e`
 - **Both**: `npm run test:all`
 
+Before your first local E2E run, install the Playwright browser with `npx playwright install chromium`.
+
 E2E tests hit the live BBC weather API and skip (never fail) when it is unreachable. CI runs on push to `main` and on pull requests (see `.github/workflows/test.yml`).
